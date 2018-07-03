@@ -64,6 +64,7 @@ func main() {
 		}
 
 		if rpc == REQRES {
+			// RPC mode, expect an answer.
 			msg, err := conn.Request(action, jsonBody, 3*time.Second)
 
 			if err != nil {
@@ -88,6 +89,7 @@ func main() {
 
 			ctx.Data(res.Code, res.ContentType, bodyBytes)
 		} else if rpc == EVENT {
+			// EVENT mode, fire and forget.
 			err = conn.Publish(action, jsonBody)
 
 			if err != nil {
