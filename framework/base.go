@@ -72,6 +72,7 @@ func (b Builder) Build() (*Service, error) {
 
 	s := &Service{conn}
 	s.startWorkers(b.workers)
+	s.startEventers(b.event)
 
 	return s, nil
 }
@@ -79,7 +80,19 @@ func (b Builder) Build() (*Service, error) {
 func (s *Service) startWorkers(workers map[channel]Worker) {
 	for c, w := range workers {
 		if c.group != "" {
+			s.conn.QueueSubscribe(c.queue, c.group, s.worker(w))
+		} else {
 			s.conn.Subscribe(c.queue, s.worker(w))
+		}
+	}
+}
+
+func (s *Service) startEventers(eventers map[channel]Eventer) {
+	for c, e := range eventers {
+		if c.group != "" {
+			s.conn.QueueSubscribe(c.queue, c.group, s.eventer(e))
+		} else {
+			s.conn.Subscribe(c.queue, s.eventer(e))
 		}
 	}
 }
