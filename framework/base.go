@@ -31,7 +31,10 @@ type (
 )
 
 func NewBuilder() Builder {
-	return Builder{}
+	return Builder{
+		workers: make(map[channel]Worker),
+		event:   make(map[channel]Eventer),
+	}
 }
 
 func (b Builder) Nats(connectUrl string, options ...nats.Option) Builder {
