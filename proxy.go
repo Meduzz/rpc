@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"./api"
+	"github.com/Meduzz/rpc/api"
 	"github.com/gin-gonic/gin"
 	"github.com/nats-io/go-nats"
 )

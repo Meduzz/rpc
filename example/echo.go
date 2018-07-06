@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 
-	"../api"
+	"github.com/Meduzz/rpc/api"
 
 	"github.com/nats-io/go-nats"
 )
