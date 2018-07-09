@@ -1,15 +1,14 @@
 package main
 
 import (
-	"encoding/json"
-
 	"github.com/Meduzz/rpc/api"
-
-	"github.com/nats-io/go-nats"
+	"github.com/Meduzz/rpc/framework"
 )
 
 func main() {
-	conn, err := nats.Connect("nats://localhost:4222")
+	b := framework.NewBuilder()
+
+	_, err := b.Nats("nats://localhost:4222").WorkerGroup("echo", "1", handler).Build()
 
 	if err != nil {
 		panic(err)
@@ -17,18 +16,10 @@ func main() {
 
 	println("Started.")
 
-	conn.QueueSubscribe("echo", "test", func(msg *nats.Msg) {
-		println("Echoing a message.")
-
-		req := &api.Req{}
-		json.Unmarshal(msg.Data, req)
-
-		res := &api.Res{200, "text/html", req.Body}
-		bodyBytes, _ := json.Marshal(res)
-
-		conn.Publish(msg.Reply, bodyBytes)
-	})
-
 	for {
 	}
+}
+
+func handler(req *api.Req) (*api.Res, error) {
+	return &api.Res{200, "text/html", req.Body}, nil
 }
