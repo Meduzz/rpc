@@ -24,6 +24,7 @@ type (
 		natsOpts []nats.Option
 		workers  map[channel]Worker
 		event    map[channel]Eventer
+		raw      map[channel]nats.MsgHandler
 	}
 
 	Worker  func(*api.Req) (*api.Res, error)
@@ -34,6 +35,7 @@ func NewBuilder() Builder {
 	return Builder{
 		workers: make(map[channel]Worker),
 		event:   make(map[channel]Eventer),
+		raw:     make(map[channel]nats.MsgHandler),
 	}
 }
 
@@ -66,6 +68,17 @@ func (b Builder) Event(topic string, eventer Eventer) Builder {
 	return b.EventGroup(topic, "", eventer)
 }
 
+func (b Builder) RawGroup(topic, group string, handler nats.MsgHandler) Builder {
+	c := channel{topic, group}
+	b.raw[c] = handler
+
+	return b
+}
+
+func (b Builder) Raw(topic string, handler nats.MsgHandler) Builder {
+	return b.RawGroup(topic, "", handler)
+}
+
 func (b Builder) Build() (*Service, error) {
 	conn, err := nats.Connect(b.natsUrl, b.natsOpts...)
 
@@ -96,6 +109,16 @@ func (s *Service) startEventers(eventers map[channel]Eventer) {
 			s.conn.QueueSubscribe(c.queue, c.group, s.eventer(e))
 		} else {
 			s.conn.Subscribe(c.queue, s.eventer(e))
+		}
+	}
+}
+
+func (s *Service) startRaw(raw map[channel]nats.MsgHandler) {
+	for c, h := range raw {
+		if c.group != "" {
+			s.conn.QueueSubscribe(c.queue, c.group, h)
+		} else {
+			s.conn.Subscribe(c.queue, h)
 		}
 	}
 }
