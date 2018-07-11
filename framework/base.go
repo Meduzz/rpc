@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/Meduzz/rpc/api"
 	"github.com/nats-io/go-nats"
@@ -159,16 +160,55 @@ func (s *Service) eventer(e Eventer) func(*nats.Msg) {
 	}
 }
 
+func (s *Service) Request(path string, req *api.Req) *api.Res {
+	jsonBytes, err := json.Marshal(req)
+
+	if err != nil {
+		return errToRes(err)
+	}
+
+	msg, err := s.conn.Request(path, jsonBytes, 3*time.Second)
+
+	if err != nil {
+		return errToRes(err)
+	}
+
+	res := &api.Res{}
+	err = json.Unmarshal(msg.Data, res)
+
+	if err != nil {
+		return errToRes(err)
+	}
+
+	return res
+}
+
+func (s *Service) Trigger(path string, event interface{}) {
+	jsonBytes, err := json.Marshal(event)
+
+	if err != nil {
+		return
+	}
+
+	s.conn.Publish(path, jsonBytes)
+}
+
 func handleError(err error, conn *nats.Conn, reply string) {
+	res := errToRes(err)
+
+	bs, _ := json.Marshal(res)
+
+	conn.Publish(reply, bs)
+}
+
+func errToRes(err error) *api.Res {
 	res := &api.Res{}
 
 	res.Code = 500
 	res.ContentType = "text/html"
 	res.Body = hex.EncodeToString([]byte(fmt.Sprintf("%i", err)))
 
-	bs, _ := json.Marshal(res)
-
-	conn.Publish(reply, bs)
+	return res
 }
 
 func handleResponse(res *api.Res, conn *nats.Conn, reply string) error {
