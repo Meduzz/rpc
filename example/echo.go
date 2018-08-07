@@ -21,5 +21,7 @@ func main() {
 }
 
 func handler(req *api.Req) (*api.Res, error) {
-	return &api.Res{200, "text/html", req.Body}, nil
+	headers := make(map[string]string)
+	headers["Content-Type"] = "text/plain"
+	return &api.Res{200, headers, req.Body}, nil
 }

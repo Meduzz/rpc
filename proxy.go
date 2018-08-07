@@ -19,8 +19,15 @@ const REQRES = "REQRES"
 const EVENT = "EVENT"
 
 func main() {
-	natsUrl := os.Getenv("NATS_URL")
-	conn, err := nats.Connect(natsUrl)
+	natsURL := os.Getenv("NATS_URL")
+	natsToken := os.Getenv("NATS_TOKEN")
+	natsOptions := make([]nats.Option, 0)
+
+	if natsToken != "" {
+		natsOptions = append(natsOptions, nats.Token(natsToken))
+	}
+
+	conn, err := nats.Connect(natsURL, natsOptions...)
 
 	if err != nil {
 		panic(err)
@@ -28,9 +35,6 @@ func main() {
 
 	server := gin.Default()
 
-	// TODO timeouts?
-	// TODO nats settings?
-	// TODO request ids?
 	server.POST("/rpc", func(ctx *gin.Context) {
 		meta := make(map[string]string, 0)
 		meta["Content-Type"] = ctx.ContentType()
