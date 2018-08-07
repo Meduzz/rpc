@@ -21,11 +21,10 @@ type (
 	}
 
 	Builder struct {
-		natsUrl  string
-		natsOpts []nats.Option
-		workers  map[channel]Worker
-		event    map[channel]Eventer
-		raw      map[channel]nats.MsgHandler
+		conn    *nats.Conn
+		workers map[channel]Worker
+		event   map[channel]Eventer
+		raw     map[channel]nats.MsgHandler
 	}
 
 	Worker  func(*api.Req) (*api.Res, error)
@@ -41,8 +40,12 @@ func NewBuilder() Builder {
 }
 
 func (b Builder) Nats(connectUrl string, options ...nats.Option) Builder {
-	b.natsUrl = connectUrl
-	b.natsOpts = options
+	conn, err := nats.Connect(connectUrl, options...)
+	b.conn = conn
+
+	if err != nil {
+		panic(err)
+	}
 
 	return b
 }
@@ -80,16 +83,15 @@ func (b Builder) Raw(topic string, handler nats.MsgHandler) Builder {
 	return b.RawGroup(topic, "", handler)
 }
 
+func (b Builder) Connection() *nats.Conn {
+	return b.conn
+}
+
 func (b Builder) Build() (*Service, error) {
-	conn, err := nats.Connect(b.natsUrl, b.natsOpts...)
-
-	if err != nil {
-		return nil, err
-	}
-
-	s := &Service{conn}
+	s := &Service{b.conn}
 	s.startWorkers(b.workers)
 	s.startEventers(b.event)
+	s.startRaw(b.raw)
 
 	return s, nil
 }
@@ -160,14 +162,14 @@ func (s *Service) eventer(e Eventer) func(*nats.Msg) {
 	}
 }
 
-func (s *Service) Request(path string, req *api.Req) *api.Res {
+func Request(conn *nats.Conn, path string, req *api.Req) *api.Res {
 	jsonBytes, err := json.Marshal(req)
 
 	if err != nil {
 		return errToRes(err)
 	}
 
-	msg, err := s.conn.Request(path, jsonBytes, 3*time.Second)
+	msg, err := conn.Request(path, jsonBytes, 3*time.Second)
 
 	if err != nil {
 		return errToRes(err)
@@ -183,14 +185,29 @@ func (s *Service) Request(path string, req *api.Req) *api.Res {
 	return res
 }
 
-func (s *Service) Trigger(path string, event interface{}) {
+func Trigger(conn *nats.Conn, path string, event interface{}) {
 	jsonBytes, err := json.Marshal(event)
 
 	if err != nil {
 		return
 	}
 
-	s.conn.Publish(path, jsonBytes)
+	conn.Publish(path, jsonBytes)
+}
+
+func DecodeBytes(source, dst []byte) error {
+	_, err := hex.Decode(source, dst)
+	return err
+}
+
+func DecodeString(str string) ([]byte, error) {
+	return hex.DecodeString(str)
+}
+
+func EncodeBytes(source []byte) string {
+	dst := make([]byte, 0)
+	hex.Encode(source, dst)
+	return string(dst)
 }
 
 func handleError(err error, conn *nats.Conn, reply string) {
