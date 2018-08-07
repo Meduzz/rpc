@@ -220,9 +220,11 @@ func handleError(err error, conn *nats.Conn, reply string) {
 
 func errToRes(err error) *api.Res {
 	res := &api.Res{}
+	headers := make(map[string]string)
+	headers["Content-Type"] = "text/html"
 
 	res.Code = 500
-	res.ContentType = "text/html"
+	res.Metadata = headers
 	res.Body = hex.EncodeToString([]byte(fmt.Sprintf("%i", err)))
 
 	return res
