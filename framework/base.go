@@ -1,7 +1,7 @@
 package framework
 
 import (
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -196,18 +196,16 @@ func Trigger(conn *nats.Conn, path string, event interface{}) {
 }
 
 func DecodeBytes(source, dst []byte) error {
-	_, err := hex.Decode(source, dst)
+	_, err := base64.StdEncoding.Decode(source, dst)
 	return err
 }
 
 func DecodeString(str string) ([]byte, error) {
-	return hex.DecodeString(str)
+	return base64.StdEncoding.DecodeString(str)
 }
 
 func EncodeBytes(source []byte) string {
-	dst := make([]byte, 0)
-	hex.Encode(source, dst)
-	return string(dst)
+	return base64.StdEncoding.EncodeToString(source)
 }
 
 func handleError(err error, conn *nats.Conn, reply string) {
@@ -225,7 +223,7 @@ func errToRes(err error) *api.Res {
 
 	res.Code = 500
 	res.Metadata = headers
-	res.Body = hex.EncodeToString([]byte(fmt.Sprintf("%i", err)))
+	res.Body = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%v", err)))
 
 	return res
 }

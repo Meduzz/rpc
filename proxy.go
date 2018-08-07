@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/sha1"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -61,7 +62,7 @@ func main() {
 			return
 		}
 
-		body := hex.EncodeToString(data)
+		body := encode(data)
 		req := &api.Req{meta, body}
 		jsonBody, err := json.Marshal(req)
 
@@ -87,7 +88,7 @@ func main() {
 				return
 			}
 
-			bodyBytes, err := hex.DecodeString(res.Body)
+			bodyBytes, err := decode(res.Body)
 
 			if err != nil {
 				ctx.AbortWithError(500, err)
@@ -130,4 +131,12 @@ func generate() string {
 	hasher := sha1.New()
 	hasher.Write(bs)
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func encode(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
+}
+
+func decode(data string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(data)
 }
