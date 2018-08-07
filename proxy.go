@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -31,8 +33,9 @@ func main() {
 	// TODO request ids?
 	server.POST("/rpc", func(ctx *gin.Context) {
 		meta := make(map[string]string, 0)
-		meta["contentType"] = ctx.ContentType()
-		meta["clientIp"] = ctx.ClientIP()
+		meta["Content-Type"] = ctx.ContentType()
+		meta["X-Client-Ip"] = ctx.ClientIP()
+		meta["X-Request-Id"] = generate()
 
 		action := ctx.Query("action")
 
@@ -87,7 +90,17 @@ func main() {
 				return
 			}
 
-			ctx.Data(res.Code, res.ContentType, bodyBytes)
+			contentType := "application/json"
+
+			for k, v := range res.Metadata {
+				if k == "Content-Type" {
+					contentType = v
+				} else {
+					ctx.Header(k, v)
+				}
+			}
+
+			ctx.Data(res.Code, contentType, bodyBytes)
 		} else if rpc == EVENT {
 			// EVENT mode, fire and forget.
 			err = conn.Publish(action, jsonBody)
@@ -104,4 +117,13 @@ func main() {
 	})
 
 	server.Run(":8080")
+}
+
+func generate() string {
+	bs := make([]byte, 100)
+	rand.Read(bs)
+
+	hasher := sha1.New()
+	hasher.Write(bs)
+	return hex.EncodeToString(hasher.Sum(nil))
 }
