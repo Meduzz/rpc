@@ -21,11 +21,12 @@ const EVENT = "EVENT"
 
 func main() {
 	natsURL := os.Getenv("NATS_URL")
-	natsToken := os.Getenv("NATS_TOKEN")
+	natsUser := os.Getenv("NATS_USER")
+	natsPass := os.Getenv("NATS_PASS")
 	natsOptions := make([]nats.Option, 0)
 
-	if natsToken != "" {
-		natsOptions = append(natsOptions, nats.Token(natsToken))
+	if natsUser != "" {
+		natsOptions = append(natsOptions, nats.UserInfo(natsUser, natsPass))
 	}
 
 	conn, err := nats.Connect(natsURL, natsOptions...)
@@ -45,7 +46,7 @@ func main() {
 		action := ctx.Query("action")
 
 		if action == "" {
-			ctx.AbortWithError(400, errors.New("No action specified."))
+			ctx.AbortWithError(400, errors.New("no action specified"))
 			return
 		}
 
