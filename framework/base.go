@@ -11,20 +11,18 @@ import (
 )
 
 type (
-	channel struct {
-		queue string
-		group string
-	}
-
 	Service struct {
-		conn *nats.Conn
+		conn          *nats.Conn
+		subscriptions map[string]*nats.Subscription
+		handlers      map[string]interface{}
+		in            chan *nats.Msg
 	}
 
 	Builder struct {
-		conn    *nats.Conn
-		workers map[channel]Worker
-		event   map[channel]Eventer
-		raw     map[channel]nats.MsgHandler
+		conn          *nats.Conn
+		in            chan *nats.Msg
+		subscriptions map[string]*nats.Subscription
+		handlers      map[string]interface{}
 	}
 
 	Worker  func(*api.Req) (*api.Res, error)
@@ -33,9 +31,9 @@ type (
 
 func NewBuilder() Builder {
 	return Builder{
-		workers: make(map[channel]Worker),
-		event:   make(map[channel]Eventer),
-		raw:     make(map[channel]nats.MsgHandler),
+		in:            make(chan *nats.Msg),
+		subscriptions: make(map[string]*nats.Subscription),
+		handlers:      make(map[string]interface{}),
 	}
 }
 
@@ -51,36 +49,57 @@ func (b Builder) Nats(connectUrl string, options ...nats.Option) Builder {
 }
 
 func (b Builder) WorkerGroup(topic, group string, worker Worker) Builder {
-	c := channel{topic, group}
-	b.workers[c] = worker
+	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
+
+	b.handlers[topic] = worker
+	b.subscriptions[topic] = sub
 
 	return b
 }
 
 func (b Builder) Worker(topic string, worker Worker) Builder {
-	return b.WorkerGroup(topic, "", worker)
+	sub, _ := b.conn.ChanSubscribe(topic, b.in)
+
+	b.handlers[topic] = worker
+	b.subscriptions[topic] = sub
+
+	return b
 }
 
 func (b Builder) EventGroup(topic, group string, eventer Eventer) Builder {
-	c := channel{topic, group}
-	b.event[c] = eventer
+	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
+
+	b.handlers[topic] = eventer
+	b.subscriptions[topic] = sub
 
 	return b
 }
 
 func (b Builder) Event(topic string, eventer Eventer) Builder {
-	return b.EventGroup(topic, "", eventer)
+	sub, _ := b.conn.ChanSubscribe(topic, b.in)
+
+	b.handlers[topic] = eventer
+	b.subscriptions[topic] = sub
+
+	return b
 }
 
 func (b Builder) RawGroup(topic, group string, handler nats.MsgHandler) Builder {
-	c := channel{topic, group}
-	b.raw[c] = handler
+	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
+
+	b.handlers[topic] = handler
+	b.subscriptions[topic] = sub
 
 	return b
 }
 
 func (b Builder) Raw(topic string, handler nats.MsgHandler) Builder {
-	return b.RawGroup(topic, "", handler)
+	sub, _ := b.conn.ChanSubscribe(topic, b.in)
+
+	b.handlers[topic] = handler
+	b.subscriptions[topic] = sub
+
+	return b
 }
 
 func (b Builder) Connection() *nats.Conn {
@@ -88,78 +107,63 @@ func (b Builder) Connection() *nats.Conn {
 }
 
 func (b Builder) Build() (*Service, error) {
-	s := &Service{b.conn}
-	s.startWorkers(b.workers)
-	s.startEventers(b.event)
-	s.startRaw(b.raw)
+	s := &Service{b.conn, b.subscriptions, b.handlers, b.in}
 
 	return s, nil
 }
 
-func (s *Service) startWorkers(workers map[channel]Worker) {
-	for c, w := range workers {
-		if c.group != "" {
-			s.conn.QueueSubscribe(c.queue, c.group, s.worker(w))
-		} else {
-			s.conn.Subscribe(c.queue, s.worker(w))
+func (s *Service) Start() {
+	for {
+		select {
+		case msg := <-s.in:
+			handler := s.handlers[msg.Subject]
+			switch h := handler.(type) {
+			case Worker:
+				res, err := s.worker(h, msg.Data)
+				if err != nil {
+					handleError(err, s.conn, msg.Reply)
+				} else {
+					handleResponse(res, s.conn, msg.Reply)
+				}
+			case Eventer:
+				s.eventer(h, msg.Data)
+			case nats.MsgHandler:
+				h(msg)
+			}
 		}
 	}
 }
 
-func (s *Service) startEventers(eventers map[channel]Eventer) {
-	for c, e := range eventers {
-		if c.group != "" {
-			s.conn.QueueSubscribe(c.queue, c.group, s.eventer(e))
-		} else {
-			s.conn.Subscribe(c.queue, s.eventer(e))
-		}
+func (s *Service) Unsubscribe(topic string) error {
+	err := s.subscriptions[topic].Drain()
+
+	if err != nil {
+		return err
 	}
+
+	return s.subscriptions[topic].Unsubscribe()
 }
 
-func (s *Service) startRaw(raw map[channel]nats.MsgHandler) {
-	for c, h := range raw {
-		if c.group != "" {
-			s.conn.QueueSubscribe(c.queue, c.group, h)
-		} else {
-			s.conn.Subscribe(c.queue, h)
-		}
+func (s *Service) worker(w Worker, msg []byte) (*api.Res, error) {
+	req := &api.Req{}
+	err := json.Unmarshal(msg, req)
+
+	if err != nil {
+		return nil, err
 	}
+
+	return w(req)
 }
 
-func (s *Service) worker(w Worker) func(*nats.Msg) {
-	return func(msg *nats.Msg) {
-		req := &api.Req{}
-		err := json.Unmarshal(msg.Data, req)
+func (s *Service) eventer(e Eventer, msg []byte) error {
+	req := &api.Req{}
+	err := json.Unmarshal(msg, req)
 
-		if err != nil {
-			handleError(err, s.conn, msg.Reply)
-		}
-
-		res, err := w(req)
-
-		if err != nil {
-			handleError(err, s.conn, msg.Reply)
-		} else {
-			handleResponse(res, s.conn, msg.Reply)
-		}
+	if err != nil {
+		return err
 	}
-}
 
-func (s *Service) eventer(e Eventer) func(*nats.Msg) {
-	return func(msg *nats.Msg) {
-		req := &api.Req{}
-		err := json.Unmarshal(msg.Data, req)
-
-		if err != nil {
-			handleError(err, s.conn, msg.Reply)
-		}
-
-		err = e(req)
-
-		if err != nil {
-			handleError(err, s.conn, msg.Reply)
-		}
-	}
+	return e(req)
 }
 
 func Request(conn *nats.Conn, path string, req *api.Req) *api.Res {

@@ -8,7 +8,7 @@ import (
 func main() {
 	b := framework.NewBuilder()
 
-	_, err := b.Nats("nats://localhost:4222").WorkerGroup("echo", "1", handler).Build()
+	service, err := b.Nats("nats://localhost:4222").WorkerGroup("echo", "1", handler).Build()
 
 	if err != nil {
 		panic(err)
@@ -16,8 +16,7 @@ func main() {
 
 	println("Started.")
 
-	for {
-	}
+	service.Start()
 }
 
 func handler(req *api.Req) (*api.Res, error) {
