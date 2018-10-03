@@ -3,7 +3,6 @@ package framework
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/Meduzz/rpc/api"
@@ -25,8 +24,10 @@ type (
 		handlers      map[string]interface{}
 	}
 
-	Worker  func(*api.Req) (*api.Res, error)
-	Eventer func(*api.Req) error
+	Worker     func(*api.Req) (*api.Res, error)
+	Eventer    func(*api.Req) error
+	RawWorker  func([]byte) ([]byte, error)
+	RawEventer func([]byte) error
 )
 
 func NewBuilder() Builder {
@@ -37,69 +38,69 @@ func NewBuilder() Builder {
 	}
 }
 
-func (b Builder) Nats(connectUrl string, options ...nats.Option) Builder {
+func (b Builder) Nats(connectUrl string, options ...nats.Option) {
 	conn, err := nats.Connect(connectUrl, options...)
 	b.conn = conn
 
 	if err != nil {
 		panic(err)
 	}
-
-	return b
 }
 
-func (b Builder) WorkerGroup(topic, group string, worker Worker) Builder {
+func (b Builder) WorkerGroup(topic, group string, worker Worker) {
 	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
 
 	b.handlers[topic] = worker
 	b.subscriptions[topic] = sub
-
-	return b
 }
 
-func (b Builder) Worker(topic string, worker Worker) Builder {
+func (b Builder) Worker(topic string, worker Worker) {
 	sub, _ := b.conn.ChanSubscribe(topic, b.in)
 
 	b.handlers[topic] = worker
 	b.subscriptions[topic] = sub
-
-	return b
 }
 
-func (b Builder) EventGroup(topic, group string, eventer Eventer) Builder {
+func (b Builder) EventGroup(topic, group string, eventer Eventer) {
 	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
 
 	b.handlers[topic] = eventer
 	b.subscriptions[topic] = sub
-
-	return b
 }
 
-func (b Builder) Event(topic string, eventer Eventer) Builder {
+func (b Builder) Event(topic string, eventer Eventer) {
 	sub, _ := b.conn.ChanSubscribe(topic, b.in)
 
 	b.handlers[topic] = eventer
 	b.subscriptions[topic] = sub
-
-	return b
 }
 
-func (b Builder) RawGroup(topic, group string, handler nats.MsgHandler) Builder {
+func (b Builder) RawGroupEvent(topic, group string, handler RawEventer) {
 	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
 
 	b.handlers[topic] = handler
 	b.subscriptions[topic] = sub
-
-	return b
 }
 
-func (b Builder) Raw(topic string, handler nats.MsgHandler) Builder {
+func (b Builder) RawEvent(topic string, handler RawEventer) {
 	sub, _ := b.conn.ChanSubscribe(topic, b.in)
 
 	b.handlers[topic] = handler
 	b.subscriptions[topic] = sub
+}
 
-	return b
+func (b Builder) RawWorkerGroup(topic, group string, handler RawWorker) {
+	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
+
+	b.handlers[topic] = handler
+	b.subscriptions[topic] = sub
+}
+
+func (b Builder) RawWorker(topic string, handler RawWorker) {
+	sub, _ := b.conn.ChanSubscribe(topic, b.in)
+
+	b.handlers[topic] = handler
+	b.subscriptions[topic] = sub
 }
 
 func (b Builder) Connection() *nats.Conn {
@@ -127,8 +128,17 @@ func (s *Service) Start() {
 				}
 			case Eventer:
 				s.eventer(h, msg.Data)
-			case nats.MsgHandler:
-				h(msg)
+			case RawWorker:
+				bs, err := h(msg.Data)
+				if err != nil {
+					dto := errToDTO(err)
+					dtoBs, _ := json.Marshal(dto)
+					s.conn.Publish(msg.Reply, dtoBs)
+				} else {
+					s.conn.Publish(msg.Reply, bs)
+				}
+			case RawEventer:
+				h(msg.Data)
 			}
 		}
 	}
@@ -223,13 +233,24 @@ func handleError(err error, conn *nats.Conn, reply string) {
 func errToRes(err error) *api.Res {
 	res := &api.Res{}
 	headers := make(map[string]string)
-	headers["Content-Type"] = "text/html"
+	headers["Content-Type"] = "application/json"
+
+	dto := errToDTO(err)
+	bs, _ := json.Marshal(dto)
 
 	res.Code = 500
 	res.Metadata = headers
-	res.Body = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%v", err)))
+	res.Body = base64.StdEncoding.EncodeToString(bs)
 
 	return res
+}
+
+func errToDTO(err error) *api.ErrorDTO {
+	dto := &api.ErrorDTO{}
+
+	dto.Message = err.Error()
+
+	return dto
 }
 
 func handleResponse(res *api.Res, conn *nats.Conn, reply string) error {
