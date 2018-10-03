@@ -11,4 +11,8 @@ type (
 		Metadata map[string]string `json:"metadata,omitempty"` // headers the proxy should use.
 		Body     string            `json:"body,omitempty"`     // hex encoded body the proxy should send.
 	}
+
+	ErrorDTO struct {
+		Message string `json:"msg"`
+	}
 )
