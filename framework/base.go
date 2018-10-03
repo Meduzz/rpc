@@ -18,10 +18,14 @@ type (
 	}
 
 	Builder struct {
-		conn          *nats.Conn
-		in            chan *nats.Msg
-		subscriptions map[string]*nats.Subscription
-		handlers      map[string]interface{}
+		conn     *nats.Conn
+		handlers map[string]interface{}
+		specs    []*TopicSpec
+	}
+
+	TopicSpec struct {
+		Topic string
+		Group string
 	}
 
 	Worker     func(*api.Req) (*api.Res, error)
@@ -30,15 +34,14 @@ type (
 	RawEventer func([]byte) error
 )
 
-func NewBuilder() Builder {
-	return Builder{
-		in:            make(chan *nats.Msg),
-		subscriptions: make(map[string]*nats.Subscription),
-		handlers:      make(map[string]interface{}),
+func NewBuilder() *Builder {
+	return &Builder{
+		handlers: make(map[string]interface{}),
+		specs:    make([]*TopicSpec, 0),
 	}
 }
 
-func (b Builder) Nats(connectUrl string, options ...nats.Option) {
+func (b *Builder) Nats(connectUrl string, options ...nats.Option) {
 	conn, err := nats.Connect(connectUrl, options...)
 	b.conn = conn
 
@@ -47,68 +50,75 @@ func (b Builder) Nats(connectUrl string, options ...nats.Option) {
 	}
 }
 
-func (b Builder) WorkerGroup(topic, group string, worker Worker) {
-	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
-
+func (b *Builder) WorkerGroup(topic, group string, worker Worker) {
+	b.addSpecc(&TopicSpec{topic, group})
 	b.handlers[topic] = worker
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) Worker(topic string, worker Worker) {
-	sub, _ := b.conn.ChanSubscribe(topic, b.in)
-
+func (b *Builder) Worker(topic string, worker Worker) {
+	b.addSpecc(&TopicSpec{topic, ""})
 	b.handlers[topic] = worker
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) EventGroup(topic, group string, eventer Eventer) {
-	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
-
+func (b *Builder) EventGroup(topic, group string, eventer Eventer) {
+	b.addSpecc(&TopicSpec{topic, group})
 	b.handlers[topic] = eventer
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) Event(topic string, eventer Eventer) {
-	sub, _ := b.conn.ChanSubscribe(topic, b.in)
-
+func (b *Builder) Event(topic string, eventer Eventer) {
+	b.addSpecc(&TopicSpec{topic, ""})
 	b.handlers[topic] = eventer
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) RawGroupEvent(topic, group string, handler RawEventer) {
-	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
-
+func (b *Builder) RawGroupEvent(topic, group string, handler RawEventer) {
+	b.addSpecc(&TopicSpec{topic, group})
 	b.handlers[topic] = handler
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) RawEvent(topic string, handler RawEventer) {
-	sub, _ := b.conn.ChanSubscribe(topic, b.in)
-
+func (b *Builder) RawEvent(topic string, handler RawEventer) {
+	b.addSpecc(&TopicSpec{topic, ""})
 	b.handlers[topic] = handler
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) RawWorkerGroup(topic, group string, handler RawWorker) {
-	sub, _ := b.conn.ChanQueueSubscribe(topic, group, b.in)
-
+func (b *Builder) RawWorkerGroup(topic, group string, handler RawWorker) {
+	b.addSpecc(&TopicSpec{topic, group})
 	b.handlers[topic] = handler
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) RawWorker(topic string, handler RawWorker) {
-	sub, _ := b.conn.ChanSubscribe(topic, b.in)
-
+func (b *Builder) RawWorker(topic string, handler RawWorker) {
+	b.addSpecc(&TopicSpec{topic, ""})
 	b.handlers[topic] = handler
-	b.subscriptions[topic] = sub
 }
 
-func (b Builder) Connection() *nats.Conn {
+func (b *Builder) Connection() *nats.Conn {
 	return b.conn
 }
 
-func (b Builder) Build() (*Service, error) {
-	s := &Service{b.conn, b.subscriptions, b.handlers, b.in}
+func (b *Builder) addSpecc(spec *TopicSpec) {
+	b.specs = append(b.specs, spec)
+}
+
+func (b *Builder) Build() (*Service, error) {
+	in := make(chan *nats.Msg)
+	s := &Service{b.conn, make(map[string]*nats.Subscription), b.handlers, in}
+
+	for _, specc := range b.specs {
+		if specc.Group != "" {
+			sub, err := b.conn.ChanQueueSubscribe(specc.Topic, specc.Group, in)
+			s.subscriptions[specc.Topic] = sub
+
+			if err != nil {
+				println(err.Error())
+			}
+		} else {
+			sub, err := b.conn.ChanSubscribe(specc.Topic, in)
+			s.subscriptions[specc.Topic] = sub
+
+			if err != nil {
+				println(err.Error())
+			}
+		}
+	}
 
 	return s, nil
 }
