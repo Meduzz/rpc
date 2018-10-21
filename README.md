@@ -10,9 +10,11 @@ Means put body on a.b.c queue, and expect an answer.
 # Run
     
     Terminal1
-    NATS_URL=nats://localhost:4222 go run proxy.go
+    cd example/proxy
+    go run app.go
 
     Terminal2
-    go run example/echo.go
+    cd example/workers
+    go run app.go
 
-    post requests to localhost:8080 with action=echo
+    post json to localhost:8080/rpc?action=echo
