@@ -12,8 +12,9 @@ import (
 
 type (
 	NatsRpcServer struct {
-		conn *nats.Conn
-		name string
+		conn   *nats.Conn
+		name   string
+		queued bool
 	}
 
 	NatsRpcClient struct {
@@ -21,14 +22,14 @@ type (
 	}
 )
 
-func NewNatsRpcServer(serviceName, url string, options []nats.Option) (api.RpcServer, error) {
+func NewNatsRpcServer(serviceName, url string, options []nats.Option, queued bool) (api.RpcServer, error) {
 	conn, err := nats.Connect(url, options...)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &NatsRpcServer{conn, serviceName}, nil
+	return &NatsRpcServer{conn, serviceName, queued}, nil
 }
 
 func NewNatsRpcClient(url string, options []nats.Option) (api.RpcClient, error) {
@@ -75,11 +76,19 @@ func (t *NatsRpcClient) Trigger(function string, body *api.Message) error {
 }
 
 func (t *NatsRpcServer) RegisterWorker(function string, handler api.Worker) {
-	t.conn.QueueSubscribe(function, t.name, t.workerWrapper(handler))
+	if t.queued {
+		t.conn.QueueSubscribe(function, t.name, t.workerWrapper(handler))
+	} else {
+		t.conn.Subscribe(function, t.workerWrapper(handler))
+	}
 }
 
 func (t *NatsRpcServer) RegisterEventer(function string, handler api.Eventer) {
-	t.conn.QueueSubscribe(function, t.name, t.eventerWrapper(handler))
+	if t.queued {
+		t.conn.QueueSubscribe(function, t.name, t.eventerWrapper(handler))
+	} else {
+		t.conn.Subscribe(function, t.eventerWrapper(handler))
+	}
 }
 
 func (t *NatsRpcServer) Start() {

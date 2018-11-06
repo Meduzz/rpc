@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	nats, err := transports.NewNatsRpcServer("example", "nats://localhost:4222", nil)
+	nats, err := transports.NewNatsRpcServer("example", "nats://localhost:4222", nil, true)
 
 	if err != nil {
 		panic(err)
