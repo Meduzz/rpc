@@ -32,6 +32,10 @@ func NewNatsRpcServer(serviceName, url string, options []nats.Option, queued boo
 	return &NatsRpcServer{conn, serviceName, queued}, nil
 }
 
+func NewNatsRpcServerConn(serviceName string, conn *nats.Conn, queued bool) api.Rpcserver {
+	return &NatsRpcServer{conn, serviceName, queued}
+}
+
 func NewNatsRpcClient(url string, options []nats.Option) (api.RpcClient, error) {
 	conn, err := nats.Connect(url, options...)
 
@@ -40,6 +44,10 @@ func NewNatsRpcClient(url string, options []nats.Option) (api.RpcClient, error) 
 	}
 
 	return &NatsRpcClient{conn}, nil
+}
+
+func NewNatsRpcClientConn(conn *nats.Conn) api.RpcClient {
+	return &NatsRpcClient{conn}
 }
 
 func (t *NatsRpcClient) Request(function string, body *api.Message) (*api.Message, error) {
