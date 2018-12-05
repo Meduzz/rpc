@@ -32,7 +32,7 @@ func NewNatsRpcServer(serviceName, url string, options []nats.Option, queued boo
 	return &NatsRpcServer{conn, serviceName, queued}, nil
 }
 
-func NewNatsRpcServerConn(serviceName string, conn *nats.Conn, queued bool) api.Rpcserver {
+func NewNatsRpcServerConn(serviceName string, conn *nats.Conn, queued bool) api.RpcServer {
 	return &NatsRpcServer{conn, serviceName, queued}
 }
 
