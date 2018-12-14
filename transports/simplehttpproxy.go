@@ -51,6 +51,12 @@ func (s *SimpleHttpProxy) Start() {
 		meta["X-Client-Ip"] = ctx.ClientIP()
 		meta["X-Request-Id"] = generate()
 
+		for k := range ctx.Request.Header {
+			if k != "Content-Type" {
+				meta[k] = ctx.Request.Header.Get(k)
+			}
+		}
+
 		action := ctx.Query("action")
 
 		if action == "" {
