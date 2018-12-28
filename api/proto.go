@@ -7,6 +7,7 @@ import (
 type (
 	Worker  func(*Message) *Message
 	Eventer func(*Message)
+	Handler func(Context)
 
 	RpcClient interface {
 		Request(function string, message *Message) (*Message, error)
@@ -16,6 +17,7 @@ type (
 	RpcServer interface {
 		RegisterWorker(function string, handler Worker)
 		RegisterEventer(function string, handler Eventer)
+		RegisterHandler(function string, handler Handler)
 		Start()
 	}
 
@@ -26,6 +28,17 @@ type (
 
 	ErrorDTO struct {
 		Message string `json:"message"`
+	}
+
+	Context interface {
+		BodyAsJSON(interface{}) error
+		BodyAsBytes() []byte
+		BodyAsMessage() (*Message, error)
+		End()
+		ReplyJSON(interface{}) error
+		ReplyBinary([]byte) error
+		ReplyMessage(*Message) error
+		Event(string, []byte) error
 	}
 )
 
