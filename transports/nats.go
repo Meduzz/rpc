@@ -20,6 +20,11 @@ type (
 	NatsRpcClient struct {
 		conn *nats.Conn
 	}
+
+	natsContext struct {
+		conn *nats.Conn
+		msg  *nats.Msg
+	}
 )
 
 func NewNatsRpcServer(serviceName, url string, options []nats.Option, queued bool) (api.RpcServer, error) {
@@ -99,6 +104,14 @@ func (t *NatsRpcServer) RegisterEventer(function string, handler api.Eventer) {
 	}
 }
 
+func (t *NatsRpcServer) RegisterHandler(function string, handler api.Handler) {
+	if t.queued {
+		t.conn.QueueSubscribe(function, t.name, t.handlerWrapper(handler))
+	} else {
+		t.conn.Subscribe(function, t.handlerWrapper(handler))
+	}
+}
+
 func (t *NatsRpcServer) Start() {
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
@@ -125,4 +138,78 @@ func (t *NatsRpcServer) eventerWrapper(handler api.Eventer) func(*nats.Msg) {
 
 		handler(req)
 	}
+}
+
+func (t *NatsRpcServer) handlerWrapper(handler api.Handler) func(*nats.Msg) {
+	return func(msg *nats.Msg) {
+		ctx := newNatsContext(t.conn, msg)
+		handler(ctx)
+	}
+}
+
+func newNatsContext(conn *nats.Conn, msg *nats.Msg) *natsContext {
+	return &natsContext{
+		conn: conn,
+		msg:  msg,
+	}
+}
+
+func (c *natsContext) BodyAsJSON(into interface{}) error {
+	return json.Unmarshal(c.msg.Data, into)
+}
+
+func (c *natsContext) BodyAsBytes() []byte {
+	return c.msg.Data
+}
+
+func (c *natsContext) BodyAsMessage() (*api.Message, error) {
+	msg := &api.Message{}
+	err := json.Unmarshal(c.msg.Data, msg)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, nil
+}
+
+func (c *natsContext) End() {}
+func (c *natsContext) ReplyJSON(data interface{}) error {
+	if c.msg.Reply != "" {
+		bs, err := json.Marshal(data)
+
+		if err != nil {
+			return err
+		}
+
+		return c.conn.Publish(c.msg.Reply, bs)
+	}
+
+	return nil // TODO potentially we return an error here instead.
+}
+
+func (c *natsContext) ReplyBinary(data []byte) error {
+	if c.msg.Reply != "" {
+		return c.conn.Publish(c.msg.Reply, data)
+	}
+
+	return nil // TODO potentially we return an error here instead.
+}
+
+func (c *natsContext) ReplyMessage(msg *api.Message) error {
+	if c.msg.Reply != "" {
+		bs, err := json.Marshal(msg)
+
+		if err != nil {
+			return err
+		}
+
+		return c.conn.Publish(c.msg.Reply, bs)
+	}
+
+	return nil // TODO potentially we return an error here instead.
+}
+
+func (c *natsContext) Event(topic string, event []byte) error {
+	return c.conn.Publish(topic, event)
 }
