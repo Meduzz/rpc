@@ -1,6 +1,10 @@
 package transports
 
 import (
+	"encoding/json"
+	"fmt"
+	"time"
+
 	"github.com/Meduzz/rpc/api"
 )
 
@@ -9,13 +13,21 @@ type (
 		name     string
 		workers  map[string]api.Worker
 		eventers map[string]api.Eventer
+		handlers map[string]api.Handler
+	}
+
+	localContext struct {
+		retChan chan *api.Message
+		msg     *api.Message
+		client  api.RpcClient
 	}
 )
 
 func NewLocalRpcServer(name string) (api.RpcServer, error) {
 	workers := make(map[string]api.Worker, 0)
 	eventers := make(map[string]api.Eventer, 0)
-	return &LocalRpcServer{name, workers, eventers}, nil
+	handlers := make(map[string]api.Handler, 0)
+	return &LocalRpcServer{name, workers, eventers, handlers}, nil
 }
 
 func NewLocalRpcClient(server *LocalRpcServer) api.RpcClient {
@@ -23,12 +35,52 @@ func NewLocalRpcClient(server *LocalRpcServer) api.RpcClient {
 }
 
 func (l *LocalRpcServer) Request(function string, body *api.Message) (*api.Message, error) {
-	ret := l.workers[function](body)
-	return ret, nil
+	for k, v := range l.workers {
+		if k == function {
+			ret := v(body)
+
+			return ret, nil
+		}
+	}
+
+	for k, v := range l.handlers {
+		if k == function {
+			retChan := make(chan *api.Message, 1)
+			v(newLocalContext(retChan, body, l))
+
+			var ret *api.Message
+			ticker := time.Tick(3 * time.Second)
+
+			select {
+			case ret = <-retChan:
+				break
+			case <-ticker:
+				ret = api.NewErrorMessage("Request took to long")
+				break
+			}
+
+			return ret, nil
+		}
+	}
+
+	return api.NewErrorMessage(fmt.Sprintf("Nothing bound to: %s", function)), nil
 }
 
 func (l *LocalRpcServer) Trigger(function string, body *api.Message) error {
-	l.eventers[function](body)
+	for k, v := range l.eventers {
+		if k == function {
+			v(body)
+			return nil
+		}
+	}
+
+	for k, v := range l.handlers {
+		if k == function {
+			v(newLocalContext(nil, body, l))
+			return nil
+		}
+	}
+
 	return nil
 }
 
@@ -40,5 +92,71 @@ func (l *LocalRpcServer) RegisterEventer(function string, handler api.Eventer) {
 	l.eventers[function] = handler
 }
 
+func (l *LocalRpcServer) RegisterHandler(function string, handler api.Handler) {
+	l.handlers[function] = handler
+}
+
 func (l *LocalRpcServer) Start() {
+}
+
+func newLocalContext(retChan chan *api.Message, msg *api.Message, client api.RpcClient) *localContext {
+	return &localContext{retChan, msg, client}
+}
+
+func (c *localContext) BodyAsJSON(into interface{}) error {
+	return json.Unmarshal(c.msg.Body, into)
+}
+
+func (c *localContext) BodyAsBytes() []byte {
+	return c.msg.Body
+}
+
+func (c *localContext) BodyAsMessage() (*api.Message, error) {
+	return c.msg, nil
+}
+
+func (c *localContext) End() {
+	if c.retChan != nil {
+		close(c.retChan)
+	}
+}
+
+func (c *localContext) ReplyJSON(data interface{}) error {
+	msg, err := api.NewMessage(data)
+
+	if err != nil {
+		close(c.retChan)
+		return err
+	}
+
+	if c.retChan != nil {
+		c.retChan <- msg
+		close(c.retChan)
+	}
+
+	return nil
+}
+
+func (c *localContext) ReplyBinary(data []byte) error {
+	msg := api.NewBytesMessage(data)
+
+	if c.retChan != nil {
+		c.retChan <- msg
+		close(c.retChan)
+	}
+
+	return nil
+}
+
+func (c *localContext) ReplyMessage(msg *api.Message) error {
+	if c.retChan != nil {
+		c.retChan <- msg
+		close(c.retChan)
+	}
+
+	return nil
+}
+
+func (c *localContext) Event(topic string, event []byte) error {
+	return c.client.Trigger(topic, api.NewBytesMessage(event))
 }

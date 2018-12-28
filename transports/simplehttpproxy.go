@@ -23,6 +23,8 @@ type (
 	}
 )
 
+// TODO turn this into a lib
+
 const MAX_BODY = 512 * 1024
 const REQRES = "request"
 const EVENT = "event"

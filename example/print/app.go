@@ -11,6 +11,7 @@ import (
 func main() {
 	server, _ := transports.NewLocalRpcServer("example")
 	server.RegisterEventer("print", printHandler)
+	server.RegisterHandler("println", printlnHandler)
 
 	client := transports.NewLocalRpcClient(server.(*transports.LocalRpcServer))
 
@@ -22,8 +23,15 @@ func main() {
 	msg.Body = json.RawMessage([]byte("Hello %s!\n"))
 
 	client.Trigger("print", msg)
+	client.Trigger("println", msg)
 }
 
 func printHandler(msg *api.Message) {
 	fmt.Printf(string(msg.Body), msg.Metadata["hello"])
+}
+
+func printlnHandler(ctx api.Context) {
+	msg, _ := ctx.BodyAsMessage()
+	bs, _ := json.Marshal(msg)
+	ctx.Event("print", bs)
 }

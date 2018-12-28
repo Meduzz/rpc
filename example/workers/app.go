@@ -12,14 +12,23 @@ func main() {
 		panic(err)
 	}
 
-	nats.RegisterWorker("echo", echoHandler)
+	nats.RegisterHandler("echo", echoHandler)
 	nats.RegisterWorker("error", errorHandler)
 	nats.Start()
 }
 
-func echoHandler(msg *api.Message) *api.Message {
+func echoHandler(ctx api.Context) {
+	msg, err := ctx.BodyAsMessage()
+
+	if err != nil {
+		errMsg := api.NewErrorMessage(err.Error())
+		ctx.ReplyMessage(errMsg)
+		return
+	}
+
 	msg.Metadata["result"] = "success"
-	return msg
+
+	ctx.ReplyMessage(msg)
 }
 
 func errorHandler(msg *api.Message) *api.Message {
