@@ -40,11 +40,11 @@ func NewSimpleHttpProxy(context, address string, transport api.RpcClient) api.Rp
 	return &SimpleHttpProxy{context, address, server, transport}
 }
 
-func (s *SimpleHttpProxy) RegisterWorker(function string, handler api.Worker) {
-}
+func (s *SimpleHttpProxy) RegisterWorker(function string, handler api.Worker) {}
 
-func (s *SimpleHttpProxy) RegisterEventer(function string, handler api.Eventer) {
-}
+func (s *SimpleHttpProxy) RegisterEventer(function string, handler api.Eventer) {}
+
+func (s *SimpleHttpProxy) RegisterHandler(function string, handler api.Handler) {}
 
 func (s *SimpleHttpProxy) Start() {
 	s.server.POST(s.context, func(ctx *gin.Context) {
