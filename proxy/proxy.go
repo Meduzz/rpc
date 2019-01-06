@@ -6,9 +6,9 @@ import (
 
 	"github.com/nats-io/go-nats"
 
-	"./encoding"
-	"./hub"
 	"github.com/Meduzz/rpc/api"
+	"github.com/Meduzz/rpc/proxy/encoding"
+	"github.com/Meduzz/rpc/proxy/hub"
 	"github.com/julienschmidt/httprouter"
 )
 
