@@ -23,7 +23,7 @@ While point a is a RpcClient that can trigger or request messages to point b ove
 
 ## RpcServer
 
-A RpcServer lets you expose address & methods pairs. An address is any topic you can come up with, ex. (```my.worker.topic```). Your method needs to implement one of the 3 messaging types to usable as point b.
+A RpcServer lets you expose address & methods pairs. An address is any topic you can come up with, ex. (```my.worker.topic```). Your method needs to implement one of the 3 method types to be usable as point b.
 
     Worker  func(*Message) *Message
     Eventer func(*Message)
