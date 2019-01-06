@@ -17,4 +17,4 @@ Means put body on a.b.c queue, and expect an answer.
     cd example/workers
     go run app.go
 
-    post json to localhost:8080/rpc?action=echo
+    post json to localhost:8080/rpc?action=echo&rpc=request
