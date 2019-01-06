@@ -4,7 +4,7 @@ What's the smallest amount of ceremony we can get away with while still calling 
 
 The whole point is shooting data between point a to point b. Lets call it messages. Besides the data, we prolly want to send some metadata. We could embedd it into the data itself, but since we're almost certain to always send some... lets make it part of the message.
 
-What's next you ask? Well, we know point a (that's where we stand), but where's point b? Do we care? How do we get to point b? Do we care? All we need is the address of point b, right? And something to send...
+What's next you ask? Well, we know point a (that's where we stand), but where's point b? Do we care? How do we get to point b? Do we care? All we need is the address of point b, right? And a piece of data to send...
 
 ## Message definition
 
