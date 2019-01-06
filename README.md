@@ -6,6 +6,13 @@ The whole point is shooting data between point a to point b. Lets call it messag
 
 What's next you ask? Well, we know point a, but where's point b? Do we care? How do we get to point b? Do we care? All we need is the address of point b.
 
+## Message definition
+
+    Message struct {
+    	Metadata map[string]string `json:"metadata,omitempty"`
+    	Body     json.RawMessage   `json:"body,omitempty"`
+    }
+
 # RPC (this lib)
 
 This is a lib designed to send messages from point a to point b. Atm the primary transport for doing so, is over NATS. A very capable messaging system.
