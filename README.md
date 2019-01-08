@@ -29,7 +29,6 @@ A RpcServer lets you expose address & methods pairs. An address is any topic you
     Eventer func(*Message)
     Handler func(Context)
 
-
 ## RpcClient
 
 As long as we know the address (it's topic) of point b we can simply request an answer from it, or trigger a notification to it with the client.
@@ -40,7 +39,7 @@ Have a look in the examples folder.
 
 [example/worker](https://github.com/Meduzz/rpc/blob/master/example/workers/app.go) - has an example of both a Worker method, and a Handler method acting as a Worker.
 
-[example/print](https://github.com/Meduzz/rpc/blob/master/example/print/app.go) - has an example of the power of the Handle method type as well as an Eventer type method.
+[example/print](https://github.com/Meduzz/rpc/blob/master/example/print/app.go) - has an example of the power of the Handle method type, as well as an Eventer type method.
 
 # Run the worker example
     
