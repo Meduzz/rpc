@@ -10,6 +10,7 @@ import (
 
 	"github.com/Meduzz/rpc/api"
 	"github.com/Meduzz/rpc/proxy"
+	"github.com/Meduzz/rpc/proxy/hub"
 	"github.com/Meduzz/rpc/proxy/util"
 	"github.com/Meduzz/rpc/transports"
 )
@@ -77,17 +78,17 @@ func encoder(req *http.Request, params map[string]string) *api.Message {
 	return msg
 }
 
-func routing(req *http.Request, params map[string]string) (string, bool) {
+func routing(req *http.Request, params map[string]string) *hub.Route {
 	query := req.URL.Query()
 
 	rpc := query.Get("rpc")
 	action := query.Get("action")
 
 	if rpc == "event" {
-		return action, false
+		return &hub.Route{true, action, false}
 	}
 
-	return action, true
+	return &hub.Route{true, action, true}
 }
 
 func generate() string {

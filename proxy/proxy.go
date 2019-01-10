@@ -3,6 +3,7 @@ package proxy
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/Meduzz/rpc/api"
 	"github.com/Meduzz/rpc/proxy/encoding"
@@ -45,16 +46,24 @@ func NewProxy(codec encoding.Codec, client api.RpcClient) *Proxy {
 }
 
 func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	// clean up host
 	// look for a matching host
 	// if match, use it
 	// if no match, use default host
 
+	host := req.Host
+
+	// TODO this will break with ipv6.
+	if strings.Contains(host, ":") {
+		host = strings.Split(host, ":")[0]
+	}
+
 	var handler *httprouter.Router
-	if handler = p.hosts[req.Host]; handler == nil {
+	if handler = p.hosts[host]; handler == nil {
 		handler = p.hosts[defaultHost]
 		log.Printf("[%s] %s %s\n", defaultHost, req.Method, req.RequestURI)
 	} else {
-		log.Printf("[%s] %s %s\n", req.Host, req.Method, req.RequestURI)
+		log.Printf("[%s] %s %s\n", host, req.Method, req.RequestURI)
 	}
 
 	handler.ServeHTTP(res, req)

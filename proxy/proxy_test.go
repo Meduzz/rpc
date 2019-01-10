@@ -9,7 +9,7 @@ import (
 	"github.com/Meduzz/helper/http/client"
 
 	"github.com/Meduzz/rpc/api"
-	"github.com/Meduzz/rpc/prox/hub"
+	"github.com/Meduzz/rpc/proxy/hub"
 	"github.com/Meduzz/rpc/transports"
 )
 
@@ -24,6 +24,8 @@ func TestMain(m *testing.M) {
 	server.RegisterHandler("noop", noopHandler)
 	client := transports.NewLocalRpcClient(server.(*transports.LocalRpcServer))
 
+	kidding := "127.0.0.1"
+
 	pxy := NewProxy(nil, client)
 	errorHub := pxy.Add(nil, "GET", "/error")
 	noopHub := pxy.Add(nil, "GET", "/noop")
@@ -31,6 +33,7 @@ func TestMain(m *testing.M) {
 	deadHub := pxy.Add(nil, "GET", "/dead")
 	authHub := pxy.Add(nil, "POST", "/auth")
 	paramsHub := pxy.Add(nil, "POST", "/hello/:word")
+	noobHub := pxy.Add(&kidding, "GET", "/noop")
 
 	paramsHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
 		return &hub.Route{true, "params", true}
@@ -66,6 +69,10 @@ func TestMain(m *testing.M) {
 
 	authHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
 		return &hub.Route{true, "params", true}
+	})
+
+	noobHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
+		return &hub.Route{true, "noop", true}
 	})
 
 	go pxy.Start(":4000")
@@ -214,6 +221,27 @@ func Test_Params(t *testing.T) {
 
 	if struckt.Message != "Hello world!" {
 		fmt.Printf("The response was not Hello world! but: %s.", struckt.Message)
+		t.Fail()
+	}
+}
+
+func Test_UnknownHosts(t *testing.T) {
+	req, err := client.GET("http://127.0.0.1:4000/noop")
+
+	if err != nil {
+		fmt.Printf("Found an error createing the request: %s", err.Error())
+		t.Fail()
+	}
+
+	res, err := req.Do(http.DefaultClient)
+
+	if err != nil {
+		fmt.Printf("Found an error reading the response: %s", err.Error())
+		t.Fail()
+	}
+
+	if res.Code() != 503 {
+		fmt.Printf("Response code was not 503 but %d.", res.Code())
 		t.Fail()
 	}
 }
