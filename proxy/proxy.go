@@ -52,9 +52,9 @@ func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var handler *httprouter.Router
 	if handler = p.hosts[req.Host]; handler == nil {
 		handler = p.hosts[defaultHost]
-		log.Printf("[%s] %s %s\n", req.Host, req.Method, req.RequestURI)
-	} else {
 		log.Printf("[%s] %s %s\n", defaultHost, req.Method, req.RequestURI)
+	} else {
+		log.Printf("[%s] %s %s\n", req.Host, req.Method, req.RequestURI)
 	}
 
 	handler.ServeHTTP(res, req)
