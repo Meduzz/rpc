@@ -122,10 +122,10 @@ func (c *localContext) Reply(msg *api.Message) error {
 	return nil
 }
 
-func (c *localContext) Event(topic string, event *api.Message) error {
+func (c *localContext) Trigger(topic string, event *api.Message) error {
 	return c.client.Trigger(topic, event)
 }
 
-func (c *localContext) Trigger(topic string, event *api.Message) (*api.Message, error) {
+func (c *localContext) Request(topic string, event *api.Message) (*api.Message, error) {
 	return c.client.Request(topic, event)
 }
