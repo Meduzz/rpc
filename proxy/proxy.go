@@ -4,11 +4,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/nats-io/go-nats"
-
 	"github.com/Meduzz/rpc/api"
 	"github.com/Meduzz/rpc/proxy/encoding"
 	"github.com/Meduzz/rpc/proxy/hub"
+	"github.com/Meduzz/rpc/transports"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -23,7 +22,7 @@ type (
 const defaultHost = "default"
 
 // NewProxy - create a new proxy object.
-// If the codec is nil, the default codec will be used.
+// If the codec is nil, the default codec will be used. The codec set here will be the fallback codec if the Hub does not have one.
 // If the client is nil, the code panics.
 func NewProxy(codec encoding.Codec, client api.RpcClient) *Proxy {
 	hosts := make(map[string]*httprouter.Router, 0)
@@ -53,11 +52,15 @@ func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var handler *httprouter.Router
 	if handler = p.hosts[req.Host]; handler == nil {
 		handler = p.hosts[defaultHost]
+		log.Printf("[%s] %s %s\n", req.Host, req.Method, req.RequestURI)
+	} else {
+		log.Printf("[%s] %s %s\n", defaultHost, req.Method, req.RequestURI)
 	}
 
 	handler.ServeHTTP(res, req)
 }
 
+// Start - bind the web server to bind.
 func (p *Proxy) Start(bind string) error {
 	log.Printf("Server listening on: %s.\n", bind)
 	return http.ListenAndServe(bind, p)
@@ -66,7 +69,7 @@ func (p *Proxy) Start(bind string) error {
 // Add the method path combo to the host, or the default host.
 // No guarantees are made to make sure this combo is not already set.
 // In that case the router will still use the old combo, but the proxy
-// return you a new hub.
+// return you a new hub. That's likely to change in the future though.
 func (p *Proxy) Add(host *string, method, path string) *hub.Hub {
 	// if host is set
 	// lookup if the host is already registered
@@ -92,25 +95,17 @@ func (p *Proxy) Add(host *string, method, path string) *hub.Hub {
 	hub := hub.NewHub()
 	handler.Handle(method, path, p.handleRequest(hub))
 
-	log.Printf("Added handler for %s requests on (%s) to %s.", method, ns, path)
+	log.Printf("Added handler for %s %s requests to namespace: [%s].", method, path, ns)
 
 	return hub
 }
 
 func (p *Proxy) handleRequest(bridge *hub.Hub) httprouter.Handle {
 	return func(res http.ResponseWriter, req *http.Request, params httprouter.Params) {
-		living := bridge.Liveliness()
-
-		if living == hub.DEAD {
-			res.WriteHeader(503)
-			return
-		}
-
 		var err error
 		req, err = bridge.Filter(req)
 
 		if err != nil {
-			log.Printf("Filter threw error: %s.", err.Error())
 			status := bridge.Status(err)
 			res.WriteHeader(status)
 			res.Write([]byte(err.Error()))
@@ -123,9 +118,14 @@ func (p *Proxy) handleRequest(bridge *hub.Hub) httprouter.Handle {
 			ps[param.Key] = param.Value
 		}
 
-		topic, rpc := bridge.Route(req, ps)
+		route := bridge.Route(req, ps)
 
-		if topic == "" {
+		if !route.Healthy && route.Topic != "" {
+			res.WriteHeader(503)
+			return
+		}
+
+		if route.Topic == "" {
 			res.WriteHeader(404)
 			return
 		}
@@ -137,22 +137,17 @@ func (p *Proxy) handleRequest(bridge *hub.Hub) httprouter.Handle {
 			msg = p.encoding.FromRequest(req, ps)
 		}
 
-		if rpc {
-			reply, err := p.client.Request(topic, msg)
+		if route.RPC {
+			reply, err := p.client.Request(route.Topic, msg)
 
 			if err != nil {
-				if err == nats.ErrTimeout {
-					if living == hub.UNKNOWN {
-						res.WriteHeader(503)
-						log.Printf("%s did not return in time: %s.", topic, err.Error())
-					} else {
-						res.WriteHeader(500)
-						log.Printf("%s caused error: %s.", topic, err.Error())
-					}
+				if err == transports.ErrTimeout {
+					res.WriteHeader(503)
 				} else {
 					res.WriteHeader(500)
-					log.Printf("%s caused error: %s.", topic, err.Error())
 				}
+
+				return
 			}
 
 			if dec := bridge.Decoder(); dec != nil {
@@ -161,7 +156,7 @@ func (p *Proxy) handleRequest(bridge *hub.Hub) httprouter.Handle {
 				p.encoding.ToResponse(reply, res)
 			}
 		} else {
-			p.client.Trigger(topic, msg)
+			p.client.Trigger(route.Topic, msg)
 			res.WriteHeader(200)
 		}
 	}

@@ -11,37 +11,36 @@ type (
 	// With the hub you can to manipulate presence (200->503->404),
 	// you can control routing. You can even abort requests.
 	Hub struct {
-		routing    RouterFunc
-		filter     FilterFunc
-		errors     ErrorFunc
-		encoder    EncodeFunc
-		decoder    DecodeFunc
-		liveliness int
+		routing RouteFunc
+		filter  FilterFunc
+		errors  ErrorFunc
+		encoder EncodeFunc
+		decoder DecodeFunc
 	}
 
-	RouterFunc func(*http.Request, map[string]string) (string, bool)
+	// Route a small struct that carries what the proxy
+	// needs to make the descition to route and to where
+	// and if to expect a response.
+	Route struct {
+		Healthy bool
+		Topic   string
+		RPC     bool
+	}
+
+	RouteFunc  func(*http.Request, map[string]string) *Route
 	FilterFunc func(*http.Request) (*http.Request, error)
 	ErrorFunc  func(error) int
 	EncodeFunc func(*http.Request, map[string]string) *api.Message
 	DecodeFunc func(*api.Message, http.ResponseWriter)
 )
 
-const (
-	DEAD = iota
-	UNKNOWN
-	LIVING
-)
-
 func NewHub() *Hub {
-	return &Hub{
-		liveliness: LIVING,
-	}
+	return &Hub{}
 }
 
 /*
 	TODO
-	Route() and Liveliness() are 2 knobs that are kind of the same. Are there any alternatives?
-	RouterFunc and EncoderFunc could prolly be merged into one.
+	There are 2 sides of Hub, what the proxy sees and what the impl sees. Atm both see everything, that could change to slim down the api a bit.
 */
 
 // Route - The proxy will call this to get a nats topic to
@@ -49,32 +48,17 @@ func NewHub() *Hub {
 // a rpc or an event call. This method will delegate to
 // your RouterFunc.
 // Returning empty string makes the proxy return 404.
-func (h *Hub) Route(req *http.Request, params map[string]string) (string, bool) {
+func (h *Hub) Route(req *http.Request, params map[string]string) *Route {
 	if h.routing != nil {
 		return h.routing(req, params)
 	}
 
-	return "", false
+	return &Route{false, "", false}
 }
 
 // SetRoute - sets the routing to use for this hub.
-func (h *Hub) SetRoute(routing RouterFunc) {
+func (h *Hub) SetRoute(routing RouteFunc) {
 	h.routing = routing
-}
-
-// Liveliness - lets the proxy know if there's any point
-// in continue this request. Ie Liveliness returning DEAD
-// will make the proxy return a 503. While at UNKNOWN
-// the proxy will try but will handle errors with silk gloves.
-// At LIVING when there's an error it will generate 500.
-func (h *Hub) Liveliness() int {
-	return h.liveliness
-}
-
-// SetLiveliness - Set the livieliness for this hub.
-// Use the exported consts of this package (DEAD,UNKNOWN,LIVING)
-func (h *Hub) SetLiveliness(i int) {
-	h.liveliness = i
 }
 
 // SetFilter  - allows you to execute arbetrary checks
