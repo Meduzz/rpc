@@ -5,40 +5,58 @@ import (
 )
 
 type (
-	Worker  func(*Message) *Message
+	// Worker a function that takes a Message and returns a Message.
+	Worker func(*Message) *Message
+	// Eventer a function that takes a Message.
 	Eventer func(*Message)
+	// Handler a function that takes a Context.
 	Handler func(Context)
 
+	// RpcClient base interface for all rpc clients.
 	RpcClient interface {
+		// Request - send a request to function and expect a reply.
+		// Implementations are expected to handle timeouts and return
+		// a ErrTimeout over a "protocol"-specific error, in those cases.
 		Request(function string, message *Message) (*Message, error)
+		// Trigger - send an event to function.
 		Trigger(function string, message *Message) error
 	}
 
+	// RpcServer base interface for all rpc servers.
 	RpcServer interface {
+		// RegisterWorker lets you bind a Worker to function.
 		RegisterWorker(function string, handler Worker)
+		// RegisterEventer lets you bind an Eventer to a function.
 		RegisterEventer(function string, handler Eventer)
+		// RegisterHandler lets you bind a Handler to a function.
 		RegisterHandler(function string, handler Handler)
+		// Start depends on the impl, but usually this will block.
 		Start()
 	}
 
+	// Message contains what's needed for rpc.
 	Message struct {
 		Metadata map[string]string `json:"metadata,omitempty"`
 		Body     json.RawMessage   `json:"body,omitempty"`
 	}
 
+	// ErrorDTO the body that's used when ever there's a server error.
 	ErrorDTO struct {
 		Message string `json:"message"`
 	}
 
+	// Context a new take to simplify things.
 	Context interface {
-		BodyAsJSON(interface{}) error
-		BodyAsBytes() []byte
-		BodyAsMessage() (*Message, error)
+		// Body fetch the body and bind it to a Message
+		Body() (*Message, error)
+		// End let the context clean up after itself.
 		End()
-		ReplyJSON(interface{}) error
-		ReplyBinary([]byte) error
-		ReplyMessage(*Message) error
-		Event(string, []byte) error
+		// Reply reply with a message.
+		Reply(*Message) error
+		// Trigger an event.
+		Trigger(string, *Message) error
+		// Request a response.
+		Request(string, *Message) (*Message, error)
 	}
 )
 
@@ -87,5 +105,6 @@ func NewErrorMessage(errorMessage string) *Message {
 
 	headers := make(map[string]string, 0)
 	headers["result"] = "error"
+
 	return &Message{headers, json.RawMessage(bs)}
 }

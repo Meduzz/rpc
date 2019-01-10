@@ -1,7 +1,6 @@
 package transports
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -49,17 +48,18 @@ func (l *LocalRpcServer) Request(function string, body *api.Message) (*api.Messa
 			v(newLocalContext(retChan, body, l))
 
 			var ret *api.Message
+			var err error
 			ticker := time.Tick(3 * time.Second)
 
 			select {
 			case ret = <-retChan:
 				break
 			case <-ticker:
-				ret = api.NewErrorMessage("Request took to long")
+				err = ErrTimeout
 				break
 			}
 
-			return ret, nil
+			return ret, err
 		}
 	}
 
@@ -103,15 +103,7 @@ func newLocalContext(retChan chan *api.Message, msg *api.Message, client api.Rpc
 	return &localContext{retChan, msg, client}
 }
 
-func (c *localContext) BodyAsJSON(into interface{}) error {
-	return json.Unmarshal(c.msg.Body, into)
-}
-
-func (c *localContext) BodyAsBytes() []byte {
-	return c.msg.Body
-}
-
-func (c *localContext) BodyAsMessage() (*api.Message, error) {
+func (c *localContext) Body() (*api.Message, error) {
 	return c.msg, nil
 }
 
@@ -121,14 +113,7 @@ func (c *localContext) End() {
 	}
 }
 
-func (c *localContext) ReplyJSON(data interface{}) error {
-	msg, err := api.NewMessage(data)
-
-	if err != nil {
-		close(c.retChan)
-		return err
-	}
-
+func (c *localContext) Reply(msg *api.Message) error {
 	if c.retChan != nil {
 		c.retChan <- msg
 		close(c.retChan)
@@ -137,26 +122,10 @@ func (c *localContext) ReplyJSON(data interface{}) error {
 	return nil
 }
 
-func (c *localContext) ReplyBinary(data []byte) error {
-	msg := api.NewBytesMessage(data)
-
-	if c.retChan != nil {
-		c.retChan <- msg
-		close(c.retChan)
-	}
-
-	return nil
+func (c *localContext) Event(topic string, event *api.Message) error {
+	return c.client.Trigger(topic, event)
 }
 
-func (c *localContext) ReplyMessage(msg *api.Message) error {
-	if c.retChan != nil {
-		c.retChan <- msg
-		close(c.retChan)
-	}
-
-	return nil
-}
-
-func (c *localContext) Event(topic string, event []byte) error {
-	return c.client.Trigger(topic, api.NewBytesMessage(event))
+func (c *localContext) Trigger(topic string, event *api.Message) (*api.Message, error) {
+	return c.client.Request(topic, event)
 }
