@@ -18,17 +18,17 @@ func main() {
 }
 
 func echoHandler(ctx api.Context) {
-	msg, err := ctx.BodyAsMessage()
+	msg, err := ctx.Body()
 
 	if err != nil {
 		errMsg := api.NewErrorMessage(err.Error())
-		ctx.ReplyMessage(errMsg)
+		ctx.Reply(errMsg)
 		return
 	}
 
 	msg.Metadata["result"] = "success"
 
-	ctx.ReplyMessage(msg)
+	ctx.Reply(msg)
 }
 
 func errorHandler(msg *api.Message) *api.Message {

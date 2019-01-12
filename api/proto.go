@@ -57,6 +57,8 @@ type (
 		Trigger(string, *Message) error
 		// Request a response.
 		Request(string, *Message) (*Message, error)
+		// Forward a message
+		Forward(string, *Message) error
 	}
 )
 

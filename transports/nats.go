@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Meduzz/rpc/api"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/go-nats"
 )
 
 type (
@@ -200,4 +200,18 @@ func (c *natsContext) Trigger(topic string, event *api.Message) error {
 
 func (c *natsContext) Request(topic string, msg *api.Message) (*api.Message, error) {
 	return request(c.conn, topic, msg)
+}
+
+func (c *natsContext) Forward(topic string, msg *api.Message) error {
+	bs, err := json.Marshal(msg)
+
+	if err != nil {
+		return err
+	}
+
+	if c.msg.Reply != "" {
+		return c.conn.PublishRequest(topic, c.msg.Reply, bs)
+	} else {
+		return c.conn.Publish(topic, bs)
+	}
 }

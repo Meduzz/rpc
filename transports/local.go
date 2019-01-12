@@ -129,3 +129,8 @@ func (c *localContext) Trigger(topic string, event *api.Message) error {
 func (c *localContext) Request(topic string, event *api.Message) (*api.Message, error) {
 	return c.client.Request(topic, event)
 }
+
+func (c *localContext) Forward(topic string, message *api.Message) error {
+	// This will have to be good enough for local? Reply will not be possible though.
+	return c.client.Trigger(topic, message)
+}

@@ -31,7 +31,6 @@ func printHandler(msg *api.Message) {
 }
 
 func printlnHandler(ctx api.Context) {
-	msg, _ := ctx.BodyAsMessage()
-	bs, _ := json.Marshal(msg)
-	ctx.Event("print", bs)
+	msg, _ := ctx.Body()
+	ctx.Trigger("print", msg)
 }
