@@ -14,7 +14,7 @@ func main() {
 
 	nats.RegisterHandler("echo", echoHandler)
 	nats.RegisterWorker("error", errorHandler)
-	nats.Start()
+	nats.Start(true)
 }
 
 func echoHandler(ctx api.Context) {
