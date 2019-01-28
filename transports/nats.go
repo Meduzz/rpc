@@ -88,11 +88,13 @@ func (t *NatsRpcServer) RegisterHandler(function string, handler api.Handler) {
 	}
 }
 
-func (t *NatsRpcServer) Start() {
-	quit := make(chan os.Signal)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
-	t.conn.Close()
+func (t *NatsRpcServer) Start(block bool) {
+	if block {
+		quit := make(chan os.Signal)
+		signal.Notify(quit, os.Interrupt)
+		<-quit
+		t.conn.Close()
+	}
 }
 
 func (t *NatsRpcServer) workerWrapper(handler api.Worker) func(*nats.Msg) {

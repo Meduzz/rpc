@@ -30,8 +30,8 @@ type (
 		RegisterEventer(function string, handler Eventer)
 		// RegisterHandler lets you bind a Handler to a function.
 		RegisterHandler(function string, handler Handler)
-		// Start depends on the impl, but usually this will block.
-		Start()
+		// Start depends on the impl, but it has the option to block.
+		Start(block bool)
 	}
 
 	// Message contains what's needed for rpc.

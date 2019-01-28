@@ -96,7 +96,7 @@ func (l *LocalRpcServer) RegisterHandler(function string, handler api.Handler) {
 	l.handlers[function] = handler
 }
 
-func (l *LocalRpcServer) Start() {
+func (l *LocalRpcServer) Start(block bool) {
 }
 
 func newLocalContext(retChan chan *api.Message, msg *api.Message, client api.RpcClient) *localContext {
