@@ -32,6 +32,8 @@ type (
 		RegisterHandler(function string, handler Handler)
 		// Start depends on the impl, but it has the option to block.
 		Start(block bool)
+		// Stop & remove a function.
+		Remove(function string)
 	}
 
 	// Message contains what's needed for rpc.

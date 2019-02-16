@@ -16,6 +16,7 @@ type (
 		conn   *nats.Conn
 		name   string
 		queued bool
+		subz   map[string]*nats.Subscription
 	}
 
 	NatsRpcClient struct {
@@ -35,11 +36,15 @@ func NewNatsRpcServer(serviceName, url string, options []nats.Option, queued boo
 		return nil, err
 	}
 
-	return &NatsRpcServer{conn, serviceName, queued}, nil
+	subz := make(map[string]*nats.Subscription)
+
+	return &NatsRpcServer{conn, serviceName, queued, subz}, nil
 }
 
 func NewNatsRpcServerConn(serviceName string, conn *nats.Conn, queued bool) api.RpcServer {
-	return &NatsRpcServer{conn, serviceName, queued}
+	subz := make(map[string]*nats.Subscription)
+
+	return &NatsRpcServer{conn, serviceName, queued, subz}
 }
 
 func NewNatsRpcClient(url string, options []nats.Option) (api.RpcClient, error) {
@@ -66,25 +71,31 @@ func (t *NatsRpcClient) Trigger(function string, body *api.Message) error {
 
 func (t *NatsRpcServer) RegisterWorker(function string, handler api.Worker) {
 	if t.queued {
-		t.conn.QueueSubscribe(function, t.name, t.workerWrapper(handler))
+		sub, _ := t.conn.QueueSubscribe(function, t.name, t.workerWrapper(handler))
+		t.subz[function] = sub
 	} else {
-		t.conn.Subscribe(function, t.workerWrapper(handler))
+		sub, _ := t.conn.Subscribe(function, t.workerWrapper(handler))
+		t.subz[function] = sub
 	}
 }
 
 func (t *NatsRpcServer) RegisterEventer(function string, handler api.Eventer) {
 	if t.queued {
-		t.conn.QueueSubscribe(function, t.name, t.eventerWrapper(handler))
+		sub, _ := t.conn.QueueSubscribe(function, t.name, t.eventerWrapper(handler))
+		t.subz[function] = sub
 	} else {
-		t.conn.Subscribe(function, t.eventerWrapper(handler))
+		sub, _ := t.conn.Subscribe(function, t.eventerWrapper(handler))
+		t.subz[function] = sub
 	}
 }
 
 func (t *NatsRpcServer) RegisterHandler(function string, handler api.Handler) {
 	if t.queued {
-		t.conn.QueueSubscribe(function, t.name, t.handlerWrapper(handler))
+		sub, _ := t.conn.QueueSubscribe(function, t.name, t.handlerWrapper(handler))
+		t.subz[function] = sub
 	} else {
-		t.conn.Subscribe(function, t.handlerWrapper(handler))
+		sub, _ := t.conn.Subscribe(function, t.handlerWrapper(handler))
+		t.subz[function] = sub
 	}
 }
 
@@ -94,6 +105,15 @@ func (t *NatsRpcServer) Start(block bool) {
 		signal.Notify(quit, os.Interrupt)
 		<-quit
 		t.conn.Close()
+	}
+}
+
+func (t *NatsRpcServer) Remove(function string) {
+	sub, ok := t.subz[function]
+
+	if ok {
+		sub.Drain()
+		delete(t.subz, function)
 	}
 }
 

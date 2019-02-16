@@ -99,6 +99,26 @@ func (l *LocalRpcServer) RegisterHandler(function string, handler api.Handler) {
 func (l *LocalRpcServer) Start(block bool) {
 }
 
+func (l *LocalRpcServer) Remove(function string) {
+	_, ok := l.eventers[function]
+
+	if ok {
+		delete(l.eventers, function)
+	}
+
+	_, ok = l.workers[function]
+
+	if ok {
+		delete(l.workers, function)
+	}
+
+	_, ok = l.handlers[function]
+
+	if ok {
+		delete(l.handlers, function)
+	}
+}
+
 func newLocalContext(retChan chan *api.Message, msg *api.Message, client api.RpcClient) *localContext {
 	return &localContext{retChan, msg, client}
 }
