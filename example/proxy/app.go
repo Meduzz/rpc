@@ -8,18 +8,21 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/Meduzz/helper/nuts"
+
+	"github.com/Meduzz/rpc"
 	"github.com/Meduzz/rpc/api"
 	"github.com/Meduzz/rpc/proxy"
 	"github.com/Meduzz/rpc/proxy/hub"
 	"github.com/Meduzz/rpc/proxy/util"
-	"github.com/Meduzz/rpc/transports"
 )
 
 const MAX_BODY = 512 * 1024
 
 func main() {
-	client, _ := transports.NewNatsRpcClient("nats://localhost:4222", nil)
-	server := proxy.NewProxy(nil, client)
+	conn, _ := nuts.Connect()
+	rpc := rpc.NewRpc(conn)
+	server := proxy.NewProxy(nil, rpc)
 	hub := server.Add(nil, "POST", "/rpc")
 
 	hub.SetFilter(filter, nil)
