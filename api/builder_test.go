@@ -1,6 +1,9 @@
 package api
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestBuildTextMessage(t *testing.T) {
 	b := Builder()
@@ -17,10 +20,20 @@ func TestBuildTextMessage(t *testing.T) {
 		t.Errorf("Header [a] was not b, but: %s.", msg.Metadata["a"])
 	}
 
-	body := string(msg.Body)
+	body, err := msg.String()
+
+	if err != nil {
+		t.Errorf("Did not expect an error reading body as a string: %s", err)
+	}
 
 	if body != "Hello world!" {
 		t.Errorf("Body was not Hello world! but: %s.", body)
+	}
+
+	_, err = json.Marshal(msg)
+
+	if err != nil {
+		t.Errorf("Message could not be serialized: %s", err)
 	}
 }
 

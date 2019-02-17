@@ -1,6 +1,8 @@
 package api
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 func NewMessage(body interface{}) (*Message, error) {
 	bs, err := json.Marshal(body)
@@ -53,4 +55,15 @@ func NewErrorMessage(errorMessage string) *Message {
 
 func (m *Message) Json(into interface{}) error {
 	return json.Unmarshal(m.Body, into)
+}
+
+func (m *Message) String() (string, error) {
+	str := ""
+	err := m.Json(&str)
+
+	if err != nil {
+		return "", err
+	}
+
+	return str, nil
 }

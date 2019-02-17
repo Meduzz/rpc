@@ -1,6 +1,9 @@
 package api
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 func Builder() *MessageBuilder {
 	return &MessageBuilder{NewEmptyMessage()}
@@ -15,7 +18,7 @@ func (m *MessageBuilder) Header(key, value string) {
 }
 
 func (m *MessageBuilder) Text(text string) {
-	m.Bytes([]byte(text))
+	m.Bytes([]byte(fmt.Sprintf(`"%s"`, text)))
 }
 
 func (m *MessageBuilder) Bytes(bs []byte) {
