@@ -37,7 +37,7 @@ func TestSubscribeAndRequest(t *testing.T) {
 	sub := NewRpc(conn)
 	sub.Handler("test", "asdf", testHandler)
 
-	msg, err := sub.Request("test", api.NewEmptyMessage())
+	msg, err := sub.Request("test", api.NewEmptyMessage(), 3)
 
 	if err != nil {
 		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())

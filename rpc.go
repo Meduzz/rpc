@@ -48,15 +48,20 @@ func (r *RPC) Handler(topic, queue string, handler api.Handler) error {
 }
 
 func (r *RPC) Remove(topic string) {
+	sub, ok := r.subz[topic]
 
+	if ok {
+		sub.Drain()
+		delete(r.subz, topic)
+	}
 }
 
 func (r *RPC) Trigger(topic string, message *api.Message) error {
 	return trigger(r.conn, topic, message)
 }
 
-func (r *RPC) Request(topic string, message *api.Message) (*api.Message, error) {
-	return request(r.conn, topic, message)
+func (r *RPC) Request(topic string, message *api.Message, timeout int) (*api.Message, error) {
+	return request(r.conn, topic, message, timeout)
 }
 
 // Run - Helper to block waiting for Interrupt then cleanup helper.

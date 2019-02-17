@@ -45,8 +45,8 @@ func (c *natsContext) Trigger(topic string, event *api.Message) error {
 	return trigger(c.conn, topic, event)
 }
 
-func (c *natsContext) Request(topic string, msg *api.Message) (*api.Message, error) {
-	return request(c.conn, topic, msg)
+func (c *natsContext) Request(topic string, msg *api.Message, timeout int) (*api.Message, error) {
+	return request(c.conn, topic, msg, timeout)
 }
 
 func (c *natsContext) Forward(topic string, msg *api.Message) error {
@@ -73,14 +73,14 @@ func trigger(conn *nats.Conn, topic string, msg *api.Message) error {
 	return conn.Publish(topic, bs)
 }
 
-func request(conn *nats.Conn, topic string, msg *api.Message) (*api.Message, error) {
+func request(conn *nats.Conn, topic string, msg *api.Message, timeout int) (*api.Message, error) {
 	bs, err := json.Marshal(msg)
 
 	if err != nil {
 		return nil, err
 	}
 
-	reply, err := conn.Request(topic, bs, 3*time.Second)
+	reply, err := conn.Request(topic, bs, time.Duration(timeout)*time.Second)
 
 	if err != nil {
 		if err == nats.ErrTimeout {
