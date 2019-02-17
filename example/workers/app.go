@@ -1,20 +1,18 @@
 package main
 
 import (
+	"github.com/Meduzz/helper/nuts"
+	"github.com/Meduzz/rpc"
 	"github.com/Meduzz/rpc/api"
-	"github.com/Meduzz/rpc/transports"
 )
 
 func main() {
-	nats, err := transports.NewNatsRpcServer("example", "nats://localhost:4222", nil, true)
+	conn, _ := nuts.Connect()
+	rpc := rpc.NewRpc(conn)
 
-	if err != nil {
-		panic(err)
-	}
+	rpc.Handler("echo", "a", echoHandler)
 
-	nats.RegisterHandler("echo", echoHandler)
-	nats.RegisterWorker("error", errorHandler)
-	nats.Start(true)
+	rpc.Run()
 }
 
 func echoHandler(ctx api.Context) {
@@ -29,8 +27,4 @@ func echoHandler(ctx api.Context) {
 	msg.Metadata["result"] = "success"
 
 	ctx.Reply(msg)
-}
-
-func errorHandler(msg *api.Message) *api.Message {
-	return api.NewErrorMessage("A very generic error :(")
 }

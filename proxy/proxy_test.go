@@ -6,11 +6,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Meduzz/helper/nuts"
+	"github.com/Meduzz/rpc"
+
 	"github.com/Meduzz/helper/http/client"
 
 	"github.com/Meduzz/rpc/api"
 	"github.com/Meduzz/rpc/proxy/hub"
-	"github.com/Meduzz/rpc/transports"
 )
 
 type Hello struct {
@@ -18,15 +20,20 @@ type Hello struct {
 }
 
 func TestMain(m *testing.M) {
-	server, _ := transports.NewLocalRpcServer("testing")
-	server.RegisterHandler("params", paramsHandler)
-	server.RegisterHandler("error", errorHandler)
-	server.RegisterHandler("noop", noopHandler)
-	client := transports.NewLocalRpcClient(server.(*transports.LocalRpcServer))
+	conn, err := nuts.Connect()
+
+	if err != nil {
+		panic(err)
+	}
+
+	rpc := rpc.NewRpc(conn)
+	rpc.Handler("params", "", paramsHandler)
+	rpc.Handler("error", "", errorHandler)
+	rpc.Handler("noop", "", noopHandler)
 
 	kidding := "127.0.0.1"
 
-	pxy := NewProxy(nil, client)
+	pxy := NewProxy(nil, rpc)
 	errorHub := pxy.Add(nil, "GET", "/error")
 	noopHub := pxy.Add(nil, "GET", "/noop")
 	missingHub := pxy.Add(nil, "GET", "/missing")
@@ -34,6 +41,8 @@ func TestMain(m *testing.M) {
 	authHub := pxy.Add(nil, "POST", "/auth")
 	paramsHub := pxy.Add(nil, "POST", "/hello/:word")
 	noobHub := pxy.Add(&kidding, "GET", "/noop")
+	triggerHub := pxy.Add(nil, "GET", "/trigger")
+	temporaryHub := pxy.Add(nil, "GET", "/temporary")
 
 	paramsHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
 		return &hub.Route{true, "params", true}
@@ -73,6 +82,14 @@ func TestMain(m *testing.M) {
 
 	noobHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
 		return &hub.Route{true, "noop", true}
+	})
+
+	triggerHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
+		return &hub.Route{true, "noop", false}
+	})
+
+	temporaryHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
+		return &hub.Route{false, "asdf", true}
 	})
 
 	go pxy.Start(":4000")
@@ -128,12 +145,14 @@ func Test_DeadFunc(t *testing.T) {
 }
 
 func Test_AuthFilter(t *testing.T) {
-	req, err := client.POST("http://localhost:4000/auth", &Hello{"world"})
+	req, err := client.POST("http://localhost:4000/auth", &Hello{"%s world"})
 
 	if err != nil {
 		fmt.Printf("Found an error createing the request: %s", err.Error())
 		t.Fail()
 	}
+
+	req.Header("word", "Hello")
 
 	res, err := req.Do(http.DefaultClient)
 
@@ -148,12 +167,14 @@ func Test_AuthFilter(t *testing.T) {
 	}
 
 	// now with basic auth set.
-	req, err = client.POST("http://localhost:4000/auth", &Hello{"world"})
+	req, err = client.POST("http://localhost:4000/auth", &Hello{"%s world"})
 
 	if err != nil {
 		fmt.Printf("Found an error createing the request: %s", err.Error())
 		t.Fail()
 	}
+
+	req.Header("word", "Hello")
 
 	req.Request().SetBasicAuth("asdf", "qwerty")
 
@@ -165,7 +186,7 @@ func Test_AuthFilter(t *testing.T) {
 	}
 
 	if res.Code() != 200 {
-		fmt.Printf("Response code was not 401 but %d.", res.Code())
+		fmt.Printf("Response code was not 200 but %d.", res.Code())
 		t.Fail()
 	}
 }
@@ -246,13 +267,64 @@ func Test_UnknownHosts(t *testing.T) {
 	}
 }
 
+func Test_TriggerHappy(t *testing.T) {
+	req, err := client.GET("http://localhost:4000/trigger")
+
+	if err != nil {
+		fmt.Printf("Found an error createing the request: %s", err.Error())
+		t.Fail()
+	}
+
+	res, err := req.Do(http.DefaultClient)
+
+	if err != nil {
+		fmt.Printf("Found an error reading the response: %s", err.Error())
+		t.Fail()
+	}
+
+	if res.Code() != 200 {
+		fmt.Printf("Response code was not 200 but %d.", res.Code())
+		t.Fail()
+	}
+}
+
+func Test_TemporarilyUnavailable(t *testing.T) {
+	req, err := client.GET("http://localhost:4000/temporary")
+
+	if err != nil {
+		fmt.Printf("Found an error createing the request: %s", err.Error())
+		t.Fail()
+	}
+
+	res, err := req.Do(http.DefaultClient)
+
+	if err != nil {
+		fmt.Printf("Found an error reading the response: %s", err.Error())
+		t.Fail()
+	}
+
+	if res.Code() != 503 {
+		fmt.Printf("Response code was not 503 but %d.", res.Code())
+		t.Fail()
+	}
+}
+
 func paramsHandler(ctx api.Context) {
 	msg, _ := ctx.Body()
 
-	// mother of all nullpointers...
-	reply := api.NewBytesMessage([]byte(fmt.Sprintf(string(msg.Body), msg.Metadata["word"])))
+	text := &Hello{}
+	msg.Json(text)
 
-	ctx.Reply(reply)
+	b := api.Builder()
+	b.Header("result", "success")
+	text.Message = fmt.Sprintf(text.Message, msg.Metadata["word"])
+	b.Json(text)
+
+	err := ctx.Reply(b.Message())
+
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func errorHandler(ctx api.Context) {

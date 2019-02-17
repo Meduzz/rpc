@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Meduzz/rpc"
 	"github.com/Meduzz/rpc/api"
 	"github.com/Meduzz/rpc/proxy/encoding"
 	"github.com/Meduzz/rpc/proxy/hub"
-	"github.com/Meduzz/rpc/transports"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -16,7 +16,7 @@ type (
 	Proxy struct {
 		hosts    map[string]*httprouter.Router
 		encoding encoding.Codec
-		client   api.RpcClient
+		rpc      *rpc.RPC
 	}
 )
 
@@ -25,21 +25,21 @@ const defaultHost = "default"
 // NewProxy - create a new proxy object.
 // If the codec is nil, the default codec will be used. The codec set here will be the fallback codec if the Hub does not have one.
 // If the client is nil, the code panics.
-func NewProxy(codec encoding.Codec, client api.RpcClient) *Proxy {
+func NewProxy(codec encoding.Codec, rpc *rpc.RPC) *Proxy {
 	hosts := make(map[string]*httprouter.Router, 0)
 
 	if codec == nil {
 		codec = encoding.NewDefaultCodec()
 	}
 
-	if client == nil {
+	if rpc == nil {
 		panic("No client present.")
 	}
 
 	p := &Proxy{
 		hosts:    hosts,
 		encoding: codec,
-		client:   client,
+		rpc:      rpc,
 	}
 
 	return p
@@ -147,10 +147,12 @@ func (p *Proxy) handleRequest(bridge *hub.Hub) httprouter.Handle {
 		}
 
 		if route.RPC {
-			reply, err := p.client.Request(route.Topic, msg)
+			reply, err := p.rpc.Request(route.Topic, msg)
 
 			if err != nil {
-				if err == transports.ErrTimeout {
+				log.Printf("Request to [%s] threw error: %s.\n", route.Topic, err)
+
+				if err == rpc.ErrTimeout {
 					res.WriteHeader(503)
 				} else {
 					res.WriteHeader(500)
@@ -165,7 +167,7 @@ func (p *Proxy) handleRequest(bridge *hub.Hub) httprouter.Handle {
 				p.encoding.ToResponse(reply, res)
 			}
 		} else {
-			p.client.Trigger(route.Topic, msg)
+			p.rpc.Trigger(route.Topic, msg)
 			res.WriteHeader(200)
 		}
 	}
