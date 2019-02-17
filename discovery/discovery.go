@@ -10,6 +10,8 @@ import (
 )
 
 type (
+	MetaEnhancer func(map[string]string)
+
 	Discovery struct {
 		rpc      *rpc.RPC
 		registry *Registry
@@ -30,6 +32,8 @@ type (
 		MaxAge int
 		// send discoveries with this interval (seconds)
 		DiscoveryInterval int
+		// Enhance the Hello with some extra data
+		Enhancer MetaEnhancer
 	}
 
 	address struct {
@@ -180,6 +184,10 @@ func (d *Discovery) triggerHello(self []*address, first bool) {
 
 	if first {
 		hello.Metadata["Register"] = "true"
+	}
+
+	if d.settings.Enhancer != nil {
+		d.settings.Enhancer(hello.Metadata)
 	}
 
 	d.rpc.Trigger(d.settings.DiscoveryTopic, hello)
