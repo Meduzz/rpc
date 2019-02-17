@@ -53,4 +53,15 @@ func TestNewErrorMessage(t *testing.T) {
 	if bytes.Compare(body, expected) != 0 {
 		t.Fail()
 	}
+
+	dto := &ErrorDTO{}
+	err := msg.Json(dto)
+
+	if err != nil {
+		t.Fail()
+	}
+
+	if dto.Message != "Alarm!" {
+		t.Fail()
+	}
 }
