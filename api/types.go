@@ -32,7 +32,7 @@ type (
 		// Trigger an event.
 		Trigger(string, *Message) error
 		// Request a response.
-		Request(string, *Message) (*Message, error)
+		Request(string, *Message, int) (*Message, error)
 		// Forward a message
 		Forward(string, *Message) error
 	}
