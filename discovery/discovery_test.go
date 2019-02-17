@@ -3,13 +3,22 @@ package discovery
 import (
 	"testing"
 
+	"github.com/Meduzz/helper/nuts"
+	"github.com/Meduzz/rpc"
+
 	"github.com/Meduzz/rpc/api"
-	"github.com/Meduzz/rpc/transports"
 )
 
 func TestCreateDiscovery_Defaults(t *testing.T) {
-	server, client := pair()
-	a := NewDiscovery(client, server, &Settings{})
+	conn, err := nuts.Connect()
+
+	if err != nil {
+		t.Fatalf("Could not connect to nats: %s.", err)
+	}
+
+	rpc := rpc.NewRpc(conn)
+
+	a := NewDiscovery(rpc, &Settings{})
 
 	if a.settings.Namespace != "*" {
 		fel("Expected namespace to be wildcard.")
@@ -32,8 +41,15 @@ func TestCreateDiscovery_Defaults(t *testing.T) {
 }
 
 func TestValidateTriggerAndRequest(t *testing.T) {
-	server, client := pair()
-	sub := NewDiscovery(client, server, &Settings{})
+	conn, err := nuts.Connect()
+
+	if err != nil {
+		t.Fatalf("Could not connect to nats: %s.", err)
+	}
+
+	rpc := rpc.NewRpc(conn)
+
+	sub := NewDiscovery(rpc, &Settings{})
 
 	_, a := sub.Request("", "", api.NewEmptyMessage())
 
@@ -51,13 +67,20 @@ func TestValidateTriggerAndRequest(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	server, client := pair()
-	sub := NewDiscovery(client, server, &Settings{})
+	conn, err := nuts.Connect()
 
-	sub.RegisterEventer("test", eventer(nil), "fqn")
+	if err != nil {
+		t.Fatalf("Could not connect to nats: %s.", err)
+	}
+
+	rpc := rpc.NewRpc(conn)
+
+	sub := NewDiscovery(rpc, &Settings{})
+
+	sub.RegisterHandler("test", "", handler(), "fqn")
 	sub.Remove("test")
 
-	_, err := sub.find("fqn", "*")
+	_, err = sub.find("fqn", "*")
 
 	if err == nil {
 		fel("Expected an error")
@@ -66,8 +89,15 @@ func TestRemove(t *testing.T) {
 }
 
 func TestDiscoveryUpdated(t *testing.T) {
-	server, client := pair()
-	sub := NewDiscovery(client, server, &Settings{})
+	conn, err := nuts.Connect()
+
+	if err != nil {
+		t.Fatalf("Could not connect to nats: %s.", err)
+	}
+
+	rpc := rpc.NewRpc(conn)
+
+	sub := NewDiscovery(rpc, &Settings{})
 
 	sub.Start(false)
 
@@ -87,52 +117,18 @@ func TestDiscoveryUpdated(t *testing.T) {
 	}
 }
 
-func TestEventer(t *testing.T) {
-	server, client := pair()
-	sub := NewDiscovery(client, server, &Settings{})
-	evtChan := make(chan *api.Message)
-	sub.RegisterEventer("eventer", eventer(evtChan), "test.eventer")
-	sub.Start(false)
-
-	addr := newAddress("test.eventer", "", "eventer", "")
-	sub.registry.Update(addr)
-
-	go sub.Trigger("test.eventer", "", api.NewEmptyMessage())
-
-	msg := <-evtChan
-
-	if len(msg.Body) > 0 {
-		fel("Expected an empty body")
-		t.Fail()
-	}
-}
-
-func TestWorker(t *testing.T) {
-	server, client := pair()
-	sub := NewDiscovery(client, server, &Settings{})
-	sub.RegisterWorker("worker", worker(), "test.worker")
-	sub.Start(false)
-
-	addr := newAddress("test.worker", "", "worker", "")
-	sub.registry.Update(addr)
-
-	msg, _ := sub.Request("test.worker", "", api.NewEmptyMessage())
-
-	if msg == nil {
-		fel("Did not expect response to be nil")
-		t.FailNow()
-	}
-
-	if len(msg.Body) > 0 {
-		fel("Expected an empty body")
-		t.Fail()
-	}
-}
-
 func TestHandler(t *testing.T) {
-	server, client := pair()
-	sub := NewDiscovery(client, server, &Settings{})
-	sub.RegisterHandler("handler", handler(), "test.handler")
+	conn, err := nuts.Connect()
+
+	if err != nil {
+		t.Fatalf("Could not connect to nats: %s.", err)
+	}
+
+	rpc := rpc.NewRpc(conn)
+
+	sub := NewDiscovery(rpc, &Settings{})
+
+	sub.RegisterHandler("handler", "", handler(), "test.handler")
 	sub.Start(false)
 
 	addr := newAddress("test.handler", "", "handler", "")
@@ -152,11 +148,19 @@ func TestHandler(t *testing.T) {
 }
 
 func TestTriggerGlobalNamespaceLookup(t *testing.T) {
-	server, client := pair()
-	sub := NewDiscovery(client, server, &Settings{
+	conn, err := nuts.Connect()
+
+	if err != nil {
+		t.Fatalf("Could not connect to nats: %s.", err)
+	}
+
+	rpc := rpc.NewRpc(conn)
+
+	sub := NewDiscovery(rpc, &Settings{
 		Namespace: "asdf",
 	})
-	sub.RegisterHandler("handler", handler(), "test.handler")
+
+	sub.RegisterHandler("handler", "", handler(), "test.handler")
 	sub.Start(false)
 
 	addr := newAddress("test.handler", "", "handler", "")
@@ -173,11 +177,6 @@ func TestTriggerGlobalNamespaceLookup(t *testing.T) {
 		fel("Expected an empty body")
 		t.Fail()
 	}
-}
-
-func pair() (api.RpcServer, api.RpcClient) {
-	server, _ := transports.NewLocalRpcServer("test")
-	return server, transports.NewLocalRpcClient(server.(*transports.LocalRpcServer))
 }
 
 func eventer(out chan *api.Message) func(*api.Message) {

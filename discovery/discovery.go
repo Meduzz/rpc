@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Meduzz/rpc"
 	"github.com/Meduzz/rpc/api"
 )
 
 type (
 	Discovery struct {
-		client   api.RpcClient
-		server   api.RpcServer
+		rpc      *rpc.RPC
 		registry *Registry
 		funcs    []*address
 		settings *Settings
@@ -42,7 +42,7 @@ type (
 	Addresses []*address
 )
 
-func NewDiscovery(client api.RpcClient, server api.RpcServer, settings *Settings) *Discovery {
+func NewDiscovery(rpc *rpc.RPC, settings *Settings) *Discovery {
 	if settings.Namespace == "" {
 		settings.Namespace = "*"
 	}
@@ -70,33 +70,15 @@ func NewDiscovery(client api.RpcClient, server api.RpcServer, settings *Settings
 	registry := NewRegistry(settings.Interests...)
 	funcs := make([]*address, 0)
 
-	return &Discovery{client, server, registry, funcs, settings}
+	return &Discovery{rpc, registry, funcs, settings}
 }
 
-func (d *Discovery) RegisterEventer(topic string, eventer api.Eventer, fqn string) {
+func (d *Discovery) RegisterHandler(topic, queue string, handler api.Handler, fqn string) {
 	if fqn == "" {
 		panic("fqn cant be empty")
 	}
 
-	d.server.RegisterEventer(topic, eventer)
-	d.funcs = append(d.funcs, &address{fqn, topic, d.settings.Version, d.settings.Namespace})
-}
-
-func (d *Discovery) RegisterWorker(topic string, worker api.Worker, fqn string) {
-	if fqn == "" {
-		panic("fqn cant be empty")
-	}
-
-	d.server.RegisterWorker(topic, worker)
-	d.funcs = append(d.funcs, &address{fqn, topic, d.settings.Version, d.settings.Namespace})
-}
-
-func (d *Discovery) RegisterHandler(topic string, handler api.Handler, fqn string) {
-	if fqn == "" {
-		panic("fqn cant be empty")
-	}
-
-	d.server.RegisterHandler(topic, handler)
+	d.rpc.Handler(topic, queue, handler)
 	d.funcs = append(d.funcs, &address{fqn, topic, d.settings.Version, d.settings.Namespace})
 }
 
@@ -106,11 +88,13 @@ func (d *Discovery) Start(block bool) {
 
 	go d.scheduledHello()
 
-	d.server.Start(block)
+	if block {
+		d.rpc.Run()
+	}
 }
 
 func (d *Discovery) Remove(topic string) {
-	d.server.Remove(topic)
+	d.rpc.Remove(topic)
 
 	keepers := make([]*address, 0)
 
@@ -134,7 +118,7 @@ func (d *Discovery) Trigger(fqn, version string, message *api.Message) error {
 		return err
 	}
 
-	return d.client.Trigger(addr.Topic, message)
+	return d.rpc.Trigger(addr.Topic, message)
 }
 
 func (d *Discovery) Request(fqn, version string, message *api.Message) (*api.Message, error) {
@@ -148,7 +132,7 @@ func (d *Discovery) Request(fqn, version string, message *api.Message) (*api.Mes
 		return nil, err
 	}
 
-	return d.client.Request(addr.Topic, message)
+	return d.rpc.Request(addr.Topic, message)
 }
 
 func (d *Discovery) find(fqn, version string) (*address, error) {
@@ -198,11 +182,12 @@ func (d *Discovery) triggerHello(self []*address, first bool) {
 		hello.Metadata["Register"] = "true"
 	}
 
-	d.client.Trigger(d.settings.DiscoveryTopic, hello)
+	d.rpc.Trigger(d.settings.DiscoveryTopic, hello)
 }
 
 func (d *Discovery) enableDiscovery() {
-	d.server.RegisterEventer(d.settings.DiscoveryTopic, func(msg *api.Message) {
+	d.rpc.Handler(d.settings.DiscoveryTopic, "", func(ctx api.Context) {
+		msg, _ := ctx.Body()
 		if msg.Metadata["Register"] == "true" {
 			// TODO atm we might respond to our own register...
 			d.hello(false)
