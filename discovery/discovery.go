@@ -125,7 +125,7 @@ func (d *Discovery) Trigger(fqn, version string, message *api.Message) error {
 	return d.rpc.Trigger(addr.Topic, message)
 }
 
-func (d *Discovery) Request(fqn, version string, message *api.Message) (*api.Message, error) {
+func (d *Discovery) Request(fqn, version string, message *api.Message, timeout int) (*api.Message, error) {
 	if fqn == "" {
 		return nil, fmt.Errorf("fqn must be set")
 	}
@@ -136,7 +136,7 @@ func (d *Discovery) Request(fqn, version string, message *api.Message) (*api.Mes
 		return nil, err
 	}
 
-	return d.rpc.Request(addr.Topic, message)
+	return d.rpc.Request(addr.Topic, message, timeout)
 }
 
 func (d *Discovery) find(fqn, version string) (*address, error) {

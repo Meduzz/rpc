@@ -51,7 +51,7 @@ func TestValidateTriggerAndRequest(t *testing.T) {
 
 	sub := NewDiscovery(rpc, &Settings{})
 
-	_, a := sub.Request("", "", api.NewEmptyMessage())
+	_, a := sub.Request("", "", api.NewEmptyMessage(), 3)
 
 	if a == nil {
 		fel("(a) Expected an error")
@@ -134,7 +134,7 @@ func TestHandler(t *testing.T) {
 	addr := newAddress("test.handler", "", "handler", "")
 	sub.registry.Update(addr)
 
-	msg, _ := sub.Request("test.handler", "", api.NewEmptyMessage())
+	msg, _ := sub.Request("test.handler", "", api.NewEmptyMessage(), 3)
 
 	if msg == nil {
 		fel("Did not expect response to be nil")
@@ -166,7 +166,7 @@ func TestTriggerGlobalNamespaceLookup(t *testing.T) {
 	addr := newAddress("test.handler", "", "handler", "")
 	sub.registry.Update(addr)
 
-	msg, _ := sub.Request("test.handler", "", api.NewEmptyMessage())
+	msg, _ := sub.Request("test.handler", "", api.NewEmptyMessage(), 3)
 
 	if msg == nil {
 		fel("Did not expect response to be nil")

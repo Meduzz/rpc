@@ -147,7 +147,7 @@ func (p *Proxy) handleRequest(bridge *hub.Hub) httprouter.Handle {
 		}
 
 		if route.RPC {
-			reply, err := p.rpc.Request(route.Topic, msg)
+			reply, err := p.rpc.Request(route.Topic, msg, route.Timeout)
 
 			if err != nil {
 				log.Printf("Request to [%s] threw error: %s.\n", route.Topic, err)

@@ -88,10 +88,10 @@ func routing(req *http.Request, params map[string]string) *hub.Route {
 	action := query.Get("action")
 
 	if rpc == "event" {
-		return &hub.Route{true, action, false}
+		return &hub.Route{true, action, false, 0}
 	}
 
-	return &hub.Route{true, action, true}
+	return &hub.Route{true, action, true, 5}
 }
 
 func generate() string {

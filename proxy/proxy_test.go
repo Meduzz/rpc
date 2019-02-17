@@ -45,23 +45,23 @@ func TestMain(m *testing.M) {
 	temporaryHub := pxy.Add(nil, "GET", "/temporary")
 
 	paramsHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{true, "params", true}
+		return &hub.Route{true, "params", true, 3}
 	})
 
 	errorHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{true, "error", true}
+		return &hub.Route{true, "error", true, 3}
 	})
 
 	noopHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{true, "noop", true}
+		return &hub.Route{true, "noop", true, 3}
 	})
 
 	missingHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{true, "", true}
+		return &hub.Route{true, "", true, 3}
 	})
 
 	deadHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{false, "", true}
+		return &hub.Route{false, "", true, 3}
 	})
 
 	authHub.SetFilter(func(req *http.Request) (*http.Request, error) {
@@ -77,19 +77,19 @@ func TestMain(m *testing.M) {
 	})
 
 	authHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{true, "params", true}
+		return &hub.Route{true, "params", true, 3}
 	})
 
 	noobHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{true, "noop", true}
+		return &hub.Route{true, "noop", true, 3}
 	})
 
 	triggerHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{true, "noop", false}
+		return &hub.Route{true, "noop", false, 3}
 	})
 
 	temporaryHub.SetRoute(func(req *http.Request, params map[string]string) *hub.Route {
-		return &hub.Route{false, "asdf", true}
+		return &hub.Route{false, "asdf", true, 3}
 	})
 
 	go pxy.Start(":4000")

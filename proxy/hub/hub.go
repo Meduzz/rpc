@@ -25,6 +25,7 @@ type (
 		Healthy bool
 		Topic   string
 		RPC     bool
+		Timeout int
 	}
 
 	RouteFunc  func(*http.Request, map[string]string) *Route
@@ -53,7 +54,7 @@ func (h *Hub) Route(req *http.Request, params map[string]string) *Route {
 		return h.routing(req, params)
 	}
 
-	return &Route{false, "", false}
+	return &Route{false, "", false, 0}
 }
 
 // SetRoute - sets the routing to use for this hub.
