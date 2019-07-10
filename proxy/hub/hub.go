@@ -48,7 +48,8 @@ func NewHub() *Hub {
 // send the request to. The bool tells the proxy whether its
 // a rpc or an event call. This method will delegate to
 // your RouterFunc.
-// Returning empty string makes the proxy return 404.
+// Returning empty route makes the proxy return 404.
+// Returning healthy=false & a route will make the proxy return 503.
 func (h *Hub) Route(req *http.Request, params map[string]string) *Route {
 	if h.routing != nil {
 		return h.routing(req, params)
