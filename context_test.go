@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Meduzz/rpc/api"
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 
 	"github.com/Meduzz/helper/nuts"
 )

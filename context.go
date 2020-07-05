@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Meduzz/rpc/api"
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 )
 
 func newNatsContext(conn *nats.Conn, msg *nats.Msg) *natsContext {

@@ -5,7 +5,7 @@ import (
 	"os/signal"
 
 	"github.com/Meduzz/rpc/api"
-	nats "github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
 )
 
 type (
@@ -70,7 +70,7 @@ func (t *RPC) Run() {
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
-	t.conn.Close()
+	t.conn.Drain()
 }
 
 func (t *RPC) handlerWrapper(handler api.Handler) func(*nats.Msg) {
