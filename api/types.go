@@ -37,5 +37,7 @@ type (
 		Request(string, *Message, int) (*Message, error)
 		// Forward a message
 		Forward(string, *Message) error
+		// Meta fetches key from metadata
+		Meta(string) (string, bool)
 	}
 )

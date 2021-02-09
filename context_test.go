@@ -4,10 +4,13 @@ import (
 	"testing"
 
 	"github.com/Meduzz/rpc/api"
-	nats "github.com/nats-io/nats.go"
 
 	"github.com/Meduzz/helper/nuts"
 )
+
+type Test struct {
+	Message string `json:"message"`
+}
 
 func TestContextCommsFuncs(t *testing.T) {
 	conn, err := nuts.Connect()
@@ -15,25 +18,36 @@ func TestContextCommsFuncs(t *testing.T) {
 	rpc := NewRpc(conn)
 	rpc.Handler("test", "", func(ctx api.Context) {
 		msg, _ := ctx.Body()
+
+		test := &Test{}
+		err := ctx.Bind(test)
+
+		if err != nil {
+			t.Fatalf("Binding message thew error: %v\n", err)
+			return
+		}
+
+		if test.Message != "Hello world!" {
+			t.Fatalf("Message was not matching the expected one")
+			return
+		}
+
 		ctx.Reply(msg)
 	})
 
-	msg := &nats.Msg{
-		Data:    []byte("Hello world!"),
-		Reply:   "test",
-		Subject: "test",
-	}
-
-	ctx := newNatsContext(conn, msg)
-	err = ctx.Reply(api.NewEmptyMessage())
+	body, _ := api.NewMessage(Test{"Hello world!"})
+	msg, err := rpc.Request("test", body, 5)
 
 	if err != nil {
-		t.Errorf("Did not expect an error: %s", err.Error())
+		t.Fatalf("RPC request threw error: %v\n", err)
+		return
 	}
 
-	err = ctx.Forward("test", api.NewEmptyMessage())
+	subject := &Test{}
+	msg.Json(subject)
 
-	if err != nil {
-		t.Errorf("There was an error: %s", err.Error())
+	if subject.Message != "Hello world!" {
+		t.Fatalf("Message in reply was not matching the expected one")
+		return
 	}
 }

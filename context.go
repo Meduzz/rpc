@@ -29,7 +29,13 @@ func (c *natsContext) Body() (*api.Message, error) {
 }
 
 func (c *natsContext) Bind(to interface{}) error {
-	return json.Unmarshal(c.body.Body, to)
+	return c.body.Json(to)
+}
+
+func (c *natsContext) Meta(key string) (string, bool) {
+	value, ok := c.body.Metadata[key]
+
+	return value, ok
 }
 
 func (c *natsContext) Reply(msg *api.Message) error {
