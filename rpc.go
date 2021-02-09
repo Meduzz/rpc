@@ -78,15 +78,15 @@ func (t *RPC) Run() {
 
 func (t *RPC) handlerWrapper(handler api.Handler) func(*nats.Msg) {
 	return func(msg *nats.Msg) {
-		msg := &api.Message{}
-		err := json.Unmarshal(msg.Data, msg)
+		body := &api.Message{}
+		err := json.Unmarshal(msg.Data, body)
 
 		if err != nil {
 			log.Printf("Payload was not of type Message: %v\n", err)
 			return
 		}
 
-		ctx := newNatsContext(t.conn, msg)
+		ctx := newNatsContext(t.conn, msg, body)
 		handler(ctx)
 	}
 }
