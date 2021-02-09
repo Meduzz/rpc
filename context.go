@@ -9,10 +9,11 @@ import (
 	nats "github.com/nats-io/nats.go"
 )
 
-func newNatsContext(conn *nats.Conn, msg *nats.Msg) *natsContext {
+func newNatsContext(conn *nats.Conn, msg *nats.Msg, body *api.Message) *natsContext {
 	return &natsContext{
 		conn: conn,
 		msg:  msg,
+		body: body,
 	}
 }
 
@@ -25,6 +26,10 @@ func (c *natsContext) Body() (*api.Message, error) {
 	}
 
 	return msg, nil
+}
+
+func (c *natsContext) Bind(to interface{}) error {
+	return json.Unmarshal(c.body.Body, to)
 }
 
 func (c *natsContext) Reply(msg *api.Message) error {

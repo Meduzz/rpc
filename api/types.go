@@ -25,8 +25,10 @@ type (
 
 	// Context a new take to simplify things.
 	Context interface {
-		// Body fetch the body and bind it to a Message
+		// Body fetch the body and bind it to a Message (depcrecated)
 		Body() (*Message, error)
+		// Bind body of message to param
+		Bind(interface{}) error
 		// Reply reply with a message.
 		Reply(*Message) error
 		// Trigger an event.

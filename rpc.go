@@ -1,6 +1,8 @@
 package rpc
 
 import (
+	"encoding/json"
+	"log"
 	"os"
 	"os/signal"
 
@@ -17,6 +19,7 @@ type (
 	natsContext struct {
 		conn *nats.Conn
 		msg  *nats.Msg
+		body *api.Message
 	}
 )
 
@@ -75,6 +78,14 @@ func (t *RPC) Run() {
 
 func (t *RPC) handlerWrapper(handler api.Handler) func(*nats.Msg) {
 	return func(msg *nats.Msg) {
+		msg := &api.Message{}
+		err := json.Unmarshal(msg.Data, msg)
+
+		if err != nil {
+			log.Printf("Payload was not of type Message: %v\n", err)
+			return
+		}
+
 		ctx := newNatsContext(t.conn, msg)
 		handler(ctx)
 	}
