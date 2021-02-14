@@ -16,14 +16,15 @@ func TestContextCommsFuncs(t *testing.T) {
 	conn, err := nuts.Connect()
 
 	rpc := NewRpc(conn)
-	rpc.Handler("test", "", func(ctx api.Context) {
-		msg, _ := ctx.Body()
+	rpc.Handler("context.test1", "", func(ctx api.Context) {
+		msg := ctx.Body()
 
 		test := &Test{}
 		err := ctx.Bind(test)
 
 		if err != nil {
-			t.Fatalf("Binding message thew error: %v\n", err)
+			t.Errorf("Binding message thew error: %v\n", err)
+			t.Fail()
 			return
 		}
 
@@ -36,7 +37,7 @@ func TestContextCommsFuncs(t *testing.T) {
 	})
 
 	body, _ := api.NewMessage(Test{"Hello world!"})
-	msg, err := rpc.Request("test", body, 5)
+	msg, err := rpc.Request("context.test1", body, 5)
 
 	if err != nil {
 		t.Fatalf("RPC request threw error: %v\n", err)

@@ -17,15 +17,8 @@ func newNatsContext(conn *nats.Conn, msg *nats.Msg, body *api.Message) *natsCont
 	}
 }
 
-func (c *natsContext) Body() (*api.Message, error) {
-	msg := &api.Message{}
-	err := json.Unmarshal(c.msg.Data, msg)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return msg, nil
+func (c *natsContext) Body() *api.Message {
+	return c.body
 }
 
 func (c *natsContext) Bind(to interface{}) error {
