@@ -67,6 +67,10 @@ func (c *natsContext) Forward(topic string, msg *api.Message) error {
 	}
 }
 
+func (c *natsContext) CanReply() bool {
+	return c.msg.Reply != ""
+}
+
 func trigger(conn *nats.Conn, topic string, msg *api.Message) error {
 	bs, err := json.Marshal(msg)
 

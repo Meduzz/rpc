@@ -33,6 +33,11 @@ func TestContextCommsFuncs(t *testing.T) {
 			return
 		}
 
+		if !ctx.CanReply() {
+			t.Fatalf("The message was not marked as replyable")
+			return
+		}
+
 		ctx.Reply(msg)
 	})
 

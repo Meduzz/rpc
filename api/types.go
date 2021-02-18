@@ -39,5 +39,7 @@ type (
 		Forward(string, *Message) error
 		// Meta fetches key from metadata
 		Meta(string) (string, bool)
+		// CanReply lets us know if the message had reply topic set
+		CanReply() bool
 	}
 )
