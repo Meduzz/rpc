@@ -3,7 +3,7 @@ package rpc
 import (
 	"testing"
 
-	"github.com/Meduzz/rpc/api"
+	"./api"
 
 	"github.com/Meduzz/helper/nuts"
 )
@@ -17,10 +17,8 @@ func TestContextCommsFuncs(t *testing.T) {
 
 	rpc := NewRpc(conn)
 	rpc.Handler("context.test1", "", func(ctx api.Context) {
-		msg := ctx.Body()
-
 		test := &Test{}
-		err := ctx.Bind(test)
+		err := ctx.Json(test)
 
 		if err != nil {
 			t.Errorf("Binding message thew error: %v\n", err)
@@ -38,10 +36,10 @@ func TestContextCommsFuncs(t *testing.T) {
 			return
 		}
 
-		ctx.Reply(msg)
+		ctx.Reply(test)
 	})
 
-	body, _ := api.NewMessage(Test{"Hello world!"})
+	body := &Test{"Hello world!"}
 	msg, err := rpc.Request("context.test1", body, 5)
 
 	if err != nil {

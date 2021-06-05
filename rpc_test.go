@@ -3,7 +3,7 @@ package rpc
 import (
 	"testing"
 
-	"github.com/Meduzz/rpc/api"
+	"./api"
 
 	"github.com/Meduzz/helper/nuts"
 )
@@ -20,7 +20,7 @@ func TestSubscribeAndTrigger(t *testing.T) {
 	sub := NewRpc(conn)
 	sub.Handler("rpc.test1", "", testHandler)
 
-	err = sub.Trigger("rpc.test1", api.NewEmptyMessage())
+	err = sub.Trigger("rpc.test1", "hello")
 
 	if err != nil {
 		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
@@ -37,7 +37,7 @@ func TestSubscribeAndRequest(t *testing.T) {
 	sub := NewRpc(conn)
 	sub.Handler("rpc.test2", "asdf", testHandler)
 
-	msg, err := sub.Request("rpc.test2", api.NewEmptyMessage(), 3)
+	msg, err := sub.Request("rpc.test2", "hello?", 3)
 
 	if err != nil {
 		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
@@ -49,7 +49,7 @@ func TestSubscribeAndRequest(t *testing.T) {
 }
 
 func testHandler(ctx api.Context) {
-	msg := ctx.Body()
+	msg := ctx.Text()
 
 	ctx.Reply(msg)
 }

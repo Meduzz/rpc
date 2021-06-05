@@ -16,15 +16,5 @@ func main() {
 }
 
 func echoHandler(ctx api.Context) {
-	msg, err := ctx.Body()
-
-	if err != nil {
-		errMsg := api.NewErrorMessage(err.Error())
-		ctx.Reply(errMsg)
-		return
-	}
-
-	msg.Metadata["result"] = "success"
-
-	ctx.Reply(msg)
+	ctx.Reply(ctx.Text())
 }
