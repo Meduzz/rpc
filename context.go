@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"./api"
@@ -29,7 +28,7 @@ func (c *natsContext) Text() string {
 }
 
 func (c *natsContext) Reply(msg interface{}) error {
-	if c.msg.Reply != "" {
+	if c.CanReply() {
 		bs, err := json.Marshal(msg)
 
 		if err != nil {
@@ -39,7 +38,7 @@ func (c *natsContext) Reply(msg interface{}) error {
 		return c.conn.Publish(c.msg.Reply, bs)
 	}
 
-	return fmt.Errorf("Message did not expect reply")
+	return ErrUnexpectedReply
 }
 
 func (c *natsContext) Trigger(topic string, event interface{}) error {
@@ -57,7 +56,7 @@ func (c *natsContext) Forward(topic string, msg interface{}) error {
 		return err
 	}
 
-	if c.msg.Reply != "" {
+	if c.CanReply() {
 		return c.conn.PublishRequest(topic, c.msg.Reply, bs)
 	} else {
 		return c.conn.Publish(topic, bs)
@@ -88,10 +87,6 @@ func request(conn *nats.Conn, topic string, msg interface{}, timeout int) (api.C
 	reply, err := conn.Request(topic, bs, time.Duration(timeout)*time.Second)
 
 	if err != nil {
-		if err == nats.ErrTimeout {
-			return nil, ErrTimeout
-		}
-
 		return nil, err
 	}
 
