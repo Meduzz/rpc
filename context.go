@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"./api"
+	"github.com/Meduzz/rpc/api"
 	nats "github.com/nats-io/nats.go"
 )
 
