@@ -1,3 +1,3 @@
 # RPC
 
-Simplicity rules.
+This wrapper will let you do simple json rpc over nats.

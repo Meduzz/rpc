@@ -1,8 +1,6 @@
 package rpc
 
 import (
-	"encoding/json"
-	"log"
 	"os"
 	"os/signal"
 
@@ -19,7 +17,6 @@ type (
 	natsContext struct {
 		conn *nats.Conn
 		msg  *nats.Msg
-		body *api.Message
 	}
 )
 
@@ -59,11 +56,11 @@ func (r *RPC) Remove(topic string) {
 	}
 }
 
-func (r *RPC) Trigger(topic string, message *api.Message) error {
+func (r *RPC) Trigger(topic string, message interface{}) error {
 	return trigger(r.conn, topic, message)
 }
 
-func (r *RPC) Request(topic string, message *api.Message, timeout int) (*api.Message, error) {
+func (r *RPC) Request(topic string, message interface{}, timeout int) (api.Deserializer, error) {
 	return request(r.conn, topic, message, timeout)
 }
 
@@ -78,15 +75,7 @@ func (t *RPC) Run() {
 
 func (t *RPC) handlerWrapper(handler api.Handler) func(*nats.Msg) {
 	return func(msg *nats.Msg) {
-		body := &api.Message{}
-		err := json.Unmarshal(msg.Data, body)
-
-		if err != nil {
-			log.Printf("Payload was not of type Message: %v\n", err)
-			return
-		}
-
-		ctx := newNatsContext(t.conn, msg, body)
+		ctx := newNatsContext(t.conn, msg)
 		handler(ctx)
 	}
 }
