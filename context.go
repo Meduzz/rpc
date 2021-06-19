@@ -23,10 +23,6 @@ func (c *natsContext) Raw() []byte {
 	return c.msg.Data
 }
 
-func (c *natsContext) Text() string {
-	return string(c.msg.Data)
-}
-
 func (c *natsContext) Reply(msg interface{}) error {
 	if c.CanReply() {
 		bs, err := json.Marshal(msg)
@@ -45,7 +41,7 @@ func (c *natsContext) Trigger(topic string, event interface{}) error {
 	return trigger(c.conn, topic, event)
 }
 
-func (c *natsContext) Request(topic string, msg interface{}, timeout int) (api.Context, error) {
+func (c *natsContext) Request(topic string, msg interface{}, timeout int) (api.Deserializer, error) {
 	return request(c.conn, topic, msg, timeout)
 }
 
@@ -77,7 +73,7 @@ func trigger(conn *nats.Conn, topic string, msg interface{}) error {
 	return conn.Publish(topic, bs)
 }
 
-func request(conn *nats.Conn, topic string, msg interface{}, timeout int) (api.Context, error) {
+func request(conn *nats.Conn, topic string, msg interface{}, timeout int) (api.Deserializer, error) {
 	bs, err := json.Marshal(msg)
 
 	if err != nil {
