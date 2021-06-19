@@ -18,7 +18,7 @@ func TestContextCommsFuncs(t *testing.T) {
 	rpc := NewRpc(conn)
 	rpc.Handler("context.test1", "", func(ctx api.Context) {
 		test := &Test{}
-		err := ctx.Json(test)
+		err := ctx.Bind(test)
 
 		if err != nil {
 			t.Errorf("Binding message thew error: %v\n", err)
@@ -48,7 +48,7 @@ func TestContextCommsFuncs(t *testing.T) {
 	}
 
 	subject := &Test{}
-	msg.Json(subject)
+	msg.Bind(subject)
 
 	if subject.Message != "Hello world!" {
 		t.Fatalf("Message in reply was not matching the expected one")

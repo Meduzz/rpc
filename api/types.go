@@ -6,7 +6,7 @@ type (
 
 	Deserializer interface {
 		// Bind body of message to param
-		Json(interface{}) error
+		Bind(interface{}) error
 		// Return the raw body
 		Raw() []byte
 	}

@@ -51,7 +51,7 @@ func TestSubscribeAndRequest(t *testing.T) {
 
 func testHandler(ctx api.Context) {
 	event := &Test{}
-	ctx.Json(event)
+	ctx.Bind(event)
 
 	if ctx.CanReply() {
 		ctx.Reply(event)

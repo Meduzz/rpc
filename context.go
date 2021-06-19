@@ -15,7 +15,7 @@ func newNatsContext(conn *nats.Conn, msg *nats.Msg) *natsContext {
 	}
 }
 
-func (c *natsContext) Json(to interface{}) error {
+func (c *natsContext) Bind(to interface{}) error {
 	return json.Unmarshal(c.msg.Data, to)
 }
 
