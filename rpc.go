@@ -60,7 +60,7 @@ func (r *RPC) Trigger(topic string, message interface{}) error {
 	return trigger(r.conn, topic, message)
 }
 
-func (r *RPC) Request(topic string, message interface{}, timeout int) (api.Context, error) {
+func (r *RPC) Request(topic string, message interface{}, timeout int) (api.Deserializer, error) {
 	return request(r.conn, topic, message, timeout)
 }
 

@@ -3,7 +3,7 @@ package rpc
 import (
 	"testing"
 
-	"./api"
+	"github.com/Meduzz/rpc/api"
 
 	"github.com/Meduzz/helper/nuts"
 )
