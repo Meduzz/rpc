@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -24,7 +25,7 @@ func (c *natsContext) Raw() []byte {
 }
 
 func (c *natsContext) Reply(msg interface{}) error {
-	if c.CanReply() {
+	if c.IsRPC() {
 		bs, err := json.Marshal(msg)
 
 		if err != nil {
@@ -45,6 +46,10 @@ func (c *natsContext) Request(topic string, msg interface{}, timeout int) (api.D
 	return request(c.conn, topic, msg, timeout)
 }
 
+func (c *natsContext) RequestContext(ctx context.Context, topic string, msg interface{}) (api.Deserializer, error) {
+	return requestContext(ctx, c.conn, topic, msg)
+}
+
 func (c *natsContext) Forward(topic string, msg interface{}) error {
 	bs, err := json.Marshal(msg)
 
@@ -52,14 +57,14 @@ func (c *natsContext) Forward(topic string, msg interface{}) error {
 		return err
 	}
 
-	if c.CanReply() {
+	if c.IsRPC() {
 		return c.conn.PublishRequest(topic, c.msg.Reply, bs)
 	} else {
 		return c.conn.Publish(topic, bs)
 	}
 }
 
-func (c *natsContext) CanReply() bool {
+func (c *natsContext) IsRPC() bool {
 	return c.msg.Reply != ""
 }
 
@@ -81,6 +86,22 @@ func request(conn *nats.Conn, topic string, msg interface{}, timeout int) (api.D
 	}
 
 	reply, err := conn.Request(topic, bs, time.Duration(timeout)*time.Second)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return newNatsContext(conn, reply), nil
+}
+
+func requestContext(ctx context.Context, conn *nats.Conn, topic string, msg interface{}) (api.Deserializer, error) {
+	bs, err := json.Marshal(msg)
+
+	if err != nil {
+		return nil, err
+	}
+
+	reply, err := conn.RequestWithContext(ctx, topic, bs)
 
 	if err != nil {
 		return nil, err

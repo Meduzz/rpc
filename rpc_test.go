@@ -53,7 +53,7 @@ func testHandler(ctx api.Context) {
 	event := &Test{}
 	ctx.Bind(event)
 
-	if ctx.CanReply() {
+	if ctx.IsRPC() {
 		ctx.Reply(event)
 	}
 }

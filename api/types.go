@@ -1,5 +1,7 @@
 package api
 
+import "context"
+
 type (
 	// Handler a function that takes a Context.
 	Handler func(Context)
@@ -20,9 +22,11 @@ type (
 		Trigger(string, interface{}) error
 		// Request a response (where request is something we can turn into json).
 		Request(string, interface{}, int) (Deserializer, error)
+		// RequestContext request a response using a context instead of a timeout
+		RequestContext(context.Context, string, interface{}) (Deserializer, error)
 		// Forward a message (where the message is something we can turn into json).
 		Forward(string, interface{}) error
-		// CanReply lets us know if the message had reply topic set
-		CanReply() bool
+		// IsRPC lets us know if the message had reply topic set
+		IsRPC() bool
 	}
 )

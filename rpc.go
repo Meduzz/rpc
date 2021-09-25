@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"os"
 	"os/signal"
 
@@ -64,10 +65,14 @@ func (r *RPC) Request(topic string, message interface{}, timeout int) (api.Deser
 	return request(r.conn, topic, message, timeout)
 }
 
+func (r *RPC) RequestContext(ctx context.Context, topic string, message interface{}) (api.Deserializer, error) {
+	return requestContext(ctx, r.conn, topic, message)
+}
+
 // Run - Helper to block waiting for Interrupt then cleanup helper.
 // But not really needed otherwise.
 func (t *RPC) Run() {
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 	t.conn.Drain()

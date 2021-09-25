@@ -13,7 +13,7 @@ type Test struct {
 }
 
 func TestContextCommsFuncs(t *testing.T) {
-	conn, err := nuts.Connect()
+	conn, _ := nuts.Connect()
 
 	rpc := NewRpc(conn)
 	rpc.Handler("context.test1", "", func(ctx api.Context) {
@@ -31,7 +31,7 @@ func TestContextCommsFuncs(t *testing.T) {
 			return
 		}
 
-		if !ctx.CanReply() {
+		if !ctx.IsRPC() {
 			t.Fatalf("The message was not marked as replyable")
 			return
 		}
