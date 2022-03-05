@@ -1,6 +1,8 @@
 package api
 
-import "context"
+import (
+	"context"
+)
 
 type (
 	// Handler a function that takes a Context.

@@ -5,5 +5,5 @@ import (
 )
 
 var (
-	ErrUnexpectedReply = fmt.Errorf("Message did not expect reply")
+	ErrUnexpectedReply = fmt.Errorf("message did not expect reply")
 )

@@ -8,7 +8,6 @@ import (
 	"github.com/Meduzz/helper/nuts"
 )
 
-var visited = false
 var data = &Test{"Hello?"}
 
 func TestSubscribeAndTrigger(t *testing.T) {
