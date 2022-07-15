@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+
+	"github.com/nats-io/nats.go"
 )
 
 type (
@@ -30,5 +32,7 @@ type (
 		Forward(string, interface{}) error
 		// IsRPC lets us know if the message had reply topic set
 		IsRPC() bool
+		// Msg returns the nats message that was returned by the handler
+		Msg() *nats.Msg
 	}
 )

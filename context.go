@@ -24,6 +24,10 @@ func (c *natsContext) Raw() []byte {
 	return c.msg.Data
 }
 
+func (c *natsContext) Msg() *nats.Msg {
+	return c.msg
+}
+
 func (c *natsContext) Reply(msg interface{}) error {
 	if c.IsRPC() {
 		bs, err := json.Marshal(msg)
@@ -51,16 +55,26 @@ func (c *natsContext) RequestContext(ctx context.Context, topic string, msg inte
 }
 
 func (c *natsContext) Forward(topic string, msg interface{}) error {
-	bs, err := json.Marshal(msg)
+	natsMsg, ok := msg.(*nats.Msg)
 
-	if err != nil {
-		return err
-	}
+	if !ok {
+		bs, err := json.Marshal(msg)
 
-	if c.IsRPC() {
-		return c.conn.PublishRequest(topic, c.msg.Reply, bs)
+		if err != nil {
+			return err
+		}
+
+		if c.IsRPC() {
+			return c.conn.PublishRequest(topic, c.msg.Reply, bs)
+		} else {
+			return c.conn.Publish(topic, bs)
+		}
 	} else {
-		return c.conn.Publish(topic, bs)
+		if topic != "" && natsMsg.Subject == "" {
+			natsMsg.Subject = topic
+		}
+
+		return c.conn.PublishMsg(natsMsg)
 	}
 }
 
@@ -69,43 +83,85 @@ func (c *natsContext) IsRPC() bool {
 }
 
 func trigger(conn *nats.Conn, topic string, msg interface{}) error {
-	bs, err := json.Marshal(msg)
+	natsMsg, ok := msg.(*nats.Msg)
 
-	if err != nil {
-		return err
+	if !ok {
+		bs, err := json.Marshal(msg)
+
+		if err != nil {
+			return err
+		}
+
+		return conn.Publish(topic, bs)
+	} else {
+		if topic != "" && natsMsg.Subject == "" {
+			natsMsg.Subject = topic
+		}
+
+		return conn.PublishMsg(natsMsg)
 	}
-
-	return conn.Publish(topic, bs)
 }
 
 func request(conn *nats.Conn, topic string, msg interface{}, timeout int) (api.Deserializer, error) {
-	bs, err := json.Marshal(msg)
+	natsMsg, ok := msg.(*nats.Msg)
 
-	if err != nil {
-		return nil, err
+	if !ok {
+		bs, err := json.Marshal(msg)
+
+		if err != nil {
+			return nil, err
+		}
+
+		reply, err := conn.Request(topic, bs, time.Duration(timeout)*time.Second)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return newNatsContext(conn, reply), nil
+	} else {
+		if topic != "" && natsMsg.Subject == "" {
+			natsMsg.Subject = topic
+		}
+
+		reply, err := conn.RequestMsg(natsMsg, time.Duration(timeout*int(time.Second)))
+
+		if err != nil {
+			return nil, err
+		}
+
+		return newNatsContext(conn, reply), nil
 	}
-
-	reply, err := conn.Request(topic, bs, time.Duration(timeout)*time.Second)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return newNatsContext(conn, reply), nil
 }
 
 func requestContext(ctx context.Context, conn *nats.Conn, topic string, msg interface{}) (api.Deserializer, error) {
-	bs, err := json.Marshal(msg)
+	natsMsg, ok := msg.(*nats.Msg)
 
-	if err != nil {
-		return nil, err
+	if !ok {
+		bs, err := json.Marshal(msg)
+
+		if err != nil {
+			return nil, err
+		}
+
+		reply, err := conn.RequestWithContext(ctx, topic, bs)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return newNatsContext(conn, reply), nil
+	} else {
+		if topic != "" && natsMsg.Subject == "" {
+			natsMsg.Subject = topic
+		}
+
+		reply, err := conn.RequestMsgWithContext(ctx, natsMsg)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return newNatsContext(conn, reply), nil
 	}
-
-	reply, err := conn.RequestWithContext(ctx, topic, bs)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return newNatsContext(conn, reply), nil
 }
