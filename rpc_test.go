@@ -2,194 +2,160 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/Meduzz/rpc/api"
-	"github.com/nats-io/nats.go"
-
 	"github.com/Meduzz/helper/nuts"
+	"github.com/Meduzz/rpc/encoding"
 )
 
-var data = &Test{"Hello?"}
+func TestRPC(t *testing.T) {
+	data := &Test{"Hello?"}
+	dataMsg, err := NewMessage(encoding.Json(), "rpc.rpc", data)
 
-func TestSubscribeAndTrigger(t *testing.T) {
+	if err != nil {
+		t.Fatal("could not create dataMsg")
+	}
+
 	conn, err := nuts.Connect()
 
 	if err != nil {
 		t.Fatal("cant connect to nats.")
 	}
 
-	sub := NewRpc(conn)
-	sub.Handler("rpc.test1", "", testHandler)
+	sub := NewRpc(conn, encoding.Json())
 
-	err = sub.Trigger("rpc.test1", data)
+	t.Run("rpc", func(t *testing.T) {
+		sub.HandleRPC("rpc.rpc", "", testHandler)
+		sub.HandleRPC("rpc.forward", "", testForwardHandler)
 
-	if err != nil {
-		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
-	}
-}
+		// TODO
+		// happyCase
+		t.Run("happy case request", func(t *testing.T) {
+			response := &Test{}
+			err = sub.Request("rpc.rpc", data, response, 3)
 
-func TestSubscribeAndRequest(t *testing.T) {
-	conn, err := nuts.Connect()
+			if err != nil {
+				t.Errorf("request threw error %s", err.Error())
+			}
 
-	if err != nil {
-		t.Fatal("cant connect to nats.")
-	}
+			if data.Message != response.Message {
+				t.Errorf("request did not match response req: %s res: %s", data.Message, response.Message)
+			}
+		})
 
-	sub := NewRpc(conn)
-	sub.Handler("rpc.test2", "asdf", testHandler)
+		// happyCaseMsg
+		t.Run("happy case request msg", func(t *testing.T) {
+			response := &Test{}
+			err = sub.Request("rpc.rpc", dataMsg, response, 3)
 
-	msg, err := sub.Request("rpc.test2", data, 3)
+			if err != nil {
+				t.Errorf("request threw error %s", err.Error())
+			}
 
-	if err != nil {
-		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
-	}
+			if data.Message != response.Message {
+				t.Errorf("request did not match response req: %s res: %s", data.Message, response.Message)
+			}
+		})
 
-	if msg == nil {
-		t.Error("Expected a message in the response")
-	}
-}
+		// forward
+		t.Run("forward request", func(t *testing.T) {
+			response := &Test{}
+			err = sub.Request("rpc.forward", data, response, 3)
 
-func TestRequestAMsg(t *testing.T) {
-	conn, err := nuts.Connect()
+			if err != nil {
+				t.Errorf("request threw error %s", err.Error())
+			}
 
-	if err != nil {
-		t.Fatal("cant connect to nats.")
-	}
+			if data.Message != response.Message {
+				t.Errorf("request did not match response req: %s res: %s", data.Message, response.Message)
+			}
+		})
 
-	sub := NewRpc(conn)
-	sub.Handler("rpc.test3", "", testHandler)
+		// withContext
+		t.Run("request with context", func(t *testing.T) {
+			ctx := context.Background()
+			ctx, cncl := context.WithDeadline(ctx, time.Now().Add(3*time.Second))
 
-	bs, err := json.Marshal(data)
+			response := &Test{}
+			err = sub.RequestContext(ctx, "rpc.forward", data, response)
 
-	if err != nil {
-		t.Fatal("cant serialize data")
-	}
+			if err != nil {
+				t.Errorf("request threw error %s", err.Error())
+			}
 
-	msg := &nats.Msg{}
-	msg.Header = make(nats.Header)
+			if data.Message != response.Message {
+				t.Errorf("request did not match response req: %s res: %s", data.Message, response.Message)
+			}
 
-	msg.Data = bs
-	msg.Header.Add("Hello", "world!")
+			defer cncl()
+		})
 
-	ret, err := sub.Request("rpc.test3", msg, 3)
-
-	if err != nil {
-		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
-	}
-
-	if ret == nil {
-		t.Error("Expected a message in the response")
-	}
-}
-
-func TestTriggerMsg(t *testing.T) {
-	conn, err := nuts.Connect()
-
-	if err != nil {
-		t.Fatal("cant connect to nats.")
-	}
-
-	sub := NewRpc(conn)
-	sub.Handler("rpc.test4", "", testHandler)
-
-	bs, err := json.Marshal(data)
-
-	if err != nil {
-		t.Fatal("cant serialize data")
-	}
-
-	msg := &nats.Msg{}
-	msg.Header = make(nats.Header)
-
-	msg.Data = bs
-	msg.Header.Add("Hello", "world!")
-
-	err = sub.Trigger("rpc.test4", msg)
-
-	if err != nil {
-		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
-	}
-}
-
-func TestForwardMsg(t *testing.T) {
-	conn, err := nuts.Connect()
-
-	if err != nil {
-		t.Fatal("cant connect to nats.")
-	}
-
-	sub := NewRpc(conn)
-	sub.Handler("rpc.test5", "", func(ctx api.Context) {
-		msg := ctx.Msg()
-
-		ctx.Forward("rpc.test5.1", msg)
+		sub.Remove("rpc.forward")
+		sub.Remove("rpc.rpc")
 	})
-	sub.Handler("rpc.test5.1", "", testHandler)
 
-	bs, err := json.Marshal(data)
+	t.Run("event", func(t *testing.T) {
+		feedback := make(chan *Test)
+		sub.HandleEvent("rpc.event", "", testEventHandler(feedback))
 
-	if err != nil {
-		t.Fatal("cant serialize data")
-	}
+		dataMsg.Subject = "rpc.event"
 
-	msg := &nats.Msg{}
-	msg.Header = make(nats.Header)
+		// TODO
+		// happyCase
+		t.Run("happy case", func(t *testing.T) {
+			err = sub.Trigger("rpc.event", data)
 
-	msg.Data = bs
-	msg.Header.Add("Hello", "world!")
+			if err != nil {
+				t.Errorf("trigger event threw error %s", err.Error())
+			}
 
-	err = sub.Trigger("rpc.test5", msg)
+			res := <-feedback
 
-	if err != nil {
-		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
-	}
+			if res.Message != data.Message {
+				t.Errorf("event body did not match request body req: %s evt: %s", data.Message, res.Message)
+			}
+		})
+
+		// hapyCaseMsg
+		t.Run("happy case msg", func(t *testing.T) {
+			err = sub.Trigger("", dataMsg)
+
+			if err != nil {
+				t.Errorf("trigger event threw error %s", err.Error())
+			}
+
+			res := <-feedback
+
+			if res.Message != data.Message {
+				t.Errorf("event body did not match request body req: %s evt: %s", data.Message, res.Message)
+			}
+		})
+	})
+
+	conn.Drain()
 }
 
-func TestRequestContextAMsg(t *testing.T) {
-	conn, err := nuts.Connect()
-
-	if err != nil {
-		t.Fatal("cant connect to nats.")
-	}
-
-	sub := NewRpc(conn)
-	sub.Handler("rpc.test6", "", testHandler)
-
-	bs, err := json.Marshal(data)
-
-	if err != nil {
-		t.Fatal("cant serialize data")
-	}
-
-	msg := &nats.Msg{}
-	msg.Header = make(nats.Header)
-
-	msg.Data = bs
-	msg.Header.Add("Hello", "world!")
-
-	ctx := context.Background()
-	ctx, cnl := context.WithDeadline(ctx, time.Now().Add(3*time.Second))
-	ret, err := sub.RequestContext(ctx, "rpc.test6", msg)
-
-	defer cnl()
-
-	if err != nil {
-		t.Errorf("Did not expect any errors when trigger message: %s", err.Error())
-	}
-
-	if ret == nil {
-		t.Error("Expected a message in the response")
-	}
-}
-
-func testHandler(ctx api.Context) {
+func testHandler(ctx *RpcContext) {
 	event := &Test{}
 	ctx.Bind(event)
 
 	if ctx.IsRPC() {
 		ctx.Reply(event)
+	}
+}
+
+func testForwardHandler(ctx *RpcContext) {
+	msg := ctx.Msg()
+
+	ctx.Forward("rpc.rpc", msg)
+}
+
+func testEventHandler(feedback chan *Test) func(*EventContext) {
+	return func(ctx *EventContext) {
+		event := &Test{}
+		ctx.Bind(event)
+
+		feedback <- event
 	}
 }
