@@ -29,7 +29,6 @@ func TestRPC(t *testing.T) {
 		sub.HandleRPC("rpc.rpc", "", testHandler)
 		sub.HandleRPC("rpc.forward", "", testForwardHandler)
 
-		// TODO
 		// happyCase
 		t.Run("happy case request", func(t *testing.T) {
 			response := &Test{}
@@ -101,7 +100,6 @@ func TestRPC(t *testing.T) {
 
 		dataMsg.Subject = "rpc.event"
 
-		// TODO
 		// happyCase
 		t.Run("happy case", func(t *testing.T) {
 			err = sub.Trigger("rpc.event", data)
