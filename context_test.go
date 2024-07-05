@@ -3,9 +3,8 @@ package rpc
 import (
 	"testing"
 
-	"github.com/Meduzz/rpc/api"
-
 	"github.com/Meduzz/helper/nuts"
+	"github.com/Meduzz/rpc/encoding"
 )
 
 type Test struct {
@@ -15,8 +14,8 @@ type Test struct {
 func TestContextCommsFuncs(t *testing.T) {
 	conn, _ := nuts.Connect()
 
-	rpc := NewRpc(conn)
-	rpc.Handler("context.test1", "", func(ctx api.Context) {
+	rpc := NewRpc(conn, encoding.Json())
+	rpc.HandleRPC("context.test1", "", func(ctx *RpcContext) {
 		test := &Test{}
 		err := ctx.Bind(test)
 
@@ -40,17 +39,15 @@ func TestContextCommsFuncs(t *testing.T) {
 	})
 
 	body := &Test{"Hello world!"}
-	msg, err := rpc.Request("context.test1", body, 5)
+	msg := &Test{}
+	err := rpc.Request("context.test1", body, msg, 5)
 
 	if err != nil {
 		t.Fatalf("RPC request threw error: %v\n", err)
 		return
 	}
 
-	subject := &Test{}
-	msg.Bind(subject)
-
-	if subject.Message != "Hello world!" {
+	if msg.Message != "Hello world!" {
 		t.Fatalf("Message in reply was not matching the expected one")
 		return
 	}

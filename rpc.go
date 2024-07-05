@@ -2,85 +2,155 @@ package rpc
 
 import (
 	"context"
-	"os"
-	"os/signal"
+	"encoding/json"
+	"time"
 
-	"github.com/Meduzz/rpc/api"
+	"github.com/Meduzz/rpc/encoding"
 	nats "github.com/nats-io/nats.go"
 )
 
 type (
-	RPC struct {
-		conn *nats.Conn
-		subz map[string]*nats.Subscription
-	}
+	// RpcHandler a function that takes a RpcContext.
+	RpcHandler func(*RpcContext)
 
-	natsContext struct {
-		conn *nats.Conn
-		msg  *nats.Msg
-	}
+	// EventHandler a funciton that takes an EventContext
+	EventHandler func(*EventContext)
 )
 
-func NewRpc(conn *nats.Conn) *RPC {
-	subz := make(map[string]*nats.Subscription)
-	return &RPC{conn, subz}
-}
-
-func (r *RPC) Handler(topic, queue string, handler api.Handler) error {
-	if queue != "" {
-		sub, err := r.conn.QueueSubscribe(topic, queue, r.handlerWrapper(handler))
-
-		if err != nil {
-			return err
-		}
-
-		r.subz[topic] = sub
-	} else {
-		sub, err := r.conn.Subscribe(topic, r.handlerWrapper(handler))
-
-		if err != nil {
-			return err
-		}
-
-		r.subz[topic] = sub
-	}
-
-	return nil
-}
-
-func (r *RPC) Remove(topic string) {
-	sub, ok := r.subz[topic]
-
-	if ok {
-		sub.Drain()
-		delete(r.subz, topic)
-	}
-}
-
-func (r *RPC) Trigger(topic string, message interface{}) error {
-	return trigger(r.conn, topic, message)
-}
-
-func (r *RPC) Request(topic string, message interface{}, timeout int) (api.Deserializer, error) {
-	return request(r.conn, topic, message, timeout)
-}
-
-func (r *RPC) RequestContext(ctx context.Context, topic string, message interface{}) (api.Deserializer, error) {
-	return requestContext(ctx, r.conn, topic, message)
-}
-
-// Run - Helper to block waiting for Interrupt then cleanup helper.
-// But not really needed otherwise.
-func (t *RPC) Run() {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
-	t.conn.Drain()
-}
-
-func (t *RPC) handlerWrapper(handler api.Handler) func(*nats.Msg) {
+func rpcWrapper(conn *nats.Conn, codec encoding.Codec, handler RpcHandler) func(*nats.Msg) {
 	return func(msg *nats.Msg) {
-		ctx := newNatsContext(t.conn, msg)
+		ctx := NewRpcContext(conn, msg, codec)
 		handler(ctx)
+	}
+}
+
+func eventWrapper(conn *nats.Conn, codec encoding.Codec, handler EventHandler) func(*nats.Msg) {
+	return func(msg *nats.Msg) {
+		ctx := NewEventContext(conn, msg, codec)
+		handler(ctx)
+	}
+}
+
+func Trigger(conn *nats.Conn, codec encoding.Codec, topic string, msg any) error {
+	natsMsg, ok := msg.(*nats.Msg)
+
+	if !ok {
+		bs, err := codec.Marshal(msg)
+
+		if err != nil {
+			return err
+		}
+
+		return conn.Publish(topic, bs)
+	} else {
+		if topic != "" && natsMsg.Subject == "" {
+			natsMsg.Subject = topic
+		}
+
+		return conn.PublishMsg(natsMsg)
+	}
+}
+
+func Request(conn *nats.Conn, codec encoding.Codec, topic string, msg any, timeout int, response any) error {
+	natsMsg, ok := msg.(*nats.Msg)
+
+	if !ok {
+		bs, err := codec.Marshal(msg)
+
+		if err != nil {
+			return err
+		}
+
+		reply, err := conn.Request(topic, bs, time.Duration(timeout)*time.Second)
+
+		if err != nil {
+			return err
+		}
+
+		return json.Unmarshal(reply.Data, response)
+	} else {
+		if topic != "" && natsMsg.Subject == "" {
+			natsMsg.Subject = topic
+		}
+
+		reply, err := conn.RequestMsg(natsMsg, time.Duration(timeout*int(time.Second)))
+
+		if err != nil {
+			return err
+		}
+
+		return json.Unmarshal(reply.Data, response)
+	}
+}
+
+func RequestContext(ctx context.Context, conn *nats.Conn, codec encoding.Codec, topic string, msg, response any) error {
+	natsMsg, ok := msg.(*nats.Msg)
+
+	if !ok {
+		bs, err := codec.Marshal(msg)
+
+		if err != nil {
+			return err
+		}
+
+		reply, err := conn.RequestWithContext(ctx, topic, bs)
+
+		if err != nil {
+			return err
+		}
+
+		return codec.Unmarshal(reply.Data, response)
+	} else {
+		if topic != "" && natsMsg.Subject == "" {
+			natsMsg.Subject = topic
+		}
+
+		reply, err := conn.RequestMsgWithContext(ctx, natsMsg)
+
+		if err != nil {
+			return err
+		}
+
+		return codec.Unmarshal(reply.Data, response)
+	}
+}
+
+func HandleRPC(conn *nats.Conn, codec encoding.Codec, topic, queue string, handler RpcHandler) (*nats.Subscription, error) {
+	if queue != "" {
+		sub, err := conn.QueueSubscribe(topic, queue, rpcWrapper(conn, codec, handler))
+
+		if err != nil {
+			return nil, err
+		}
+
+		return sub, nil
+	} else {
+		sub, err := conn.Subscribe(topic, rpcWrapper(conn, codec, handler))
+
+		if err != nil {
+			return nil, err
+		}
+
+		return sub, nil
+	}
+}
+
+func HandleEvent(conn *nats.Conn, codec encoding.Codec, topic, queue string, handler EventHandler) (*nats.Subscription, error) {
+	if queue != "" {
+		sub, err := conn.QueueSubscribe(topic, queue, eventWrapper(conn, codec, handler))
+
+		if err != nil {
+			return nil, err
+		}
+
+		return sub, nil
+	} else {
+		sub, err := conn.Subscribe(topic, eventWrapper(conn, codec, handler))
+
+		if err != nil {
+			return nil, err
+		}
+
+		return sub, nil
 	}
 }
