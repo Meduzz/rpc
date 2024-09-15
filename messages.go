@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"github.com/Meduzz/rpc/encoding"
-	"github.com/nats-io/nats.go"
+	nats "github.com/nats-io/nats.go"
 )
 
 // NewMessage - create a new message from the provided topic and body encoded with the provided codec.

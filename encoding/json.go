@@ -17,3 +17,7 @@ func (j *jsonCodec) Marshal(it any) ([]byte, error) {
 func (j *jsonCodec) Unmarshal(bs []byte, to any) error {
 	return json.Unmarshal(bs, to)
 }
+
+func (j *jsonCodec) Mime() string {
+	return "aplication/json"
+}

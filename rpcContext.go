@@ -2,9 +2,9 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/Meduzz/rpc/encoding"
+	"github.com/Meduzz/rpc/messages"
 	nats "github.com/nats-io/nats.go"
 )
 
@@ -38,16 +38,40 @@ func (c *RpcContext) Msg() *nats.Msg {
 
 func (c *RpcContext) Reply(msg any) error {
 	if c.IsRPC() {
-		bs, err := json.Marshal(msg)
+		natsMsg, ok := msg.(*nats.Msg)
 
-		if err != nil {
-			return err
+		if !ok {
+			bs, err := c.codec.Marshal(msg)
+
+			if err != nil {
+				return err
+			}
+
+			return c.conn.Publish(c.msg.Reply, bs)
+		} else {
+			if natsMsg.Subject != c.msg.Reply {
+				natsMsg.Subject = c.msg.Reply
+			}
+
+			return c.conn.PublishMsg(natsMsg)
 		}
-
-		return c.conn.Publish(c.msg.Reply, bs)
 	}
 
 	return ErrUnexpectedReply
+}
+
+func (c *RpcContext) ReplyBuilder(building func(*messages.MsgBuilder)) error {
+	if !c.IsRPC() {
+		return ErrUnexpectedReply
+	}
+
+	msg, err := messages.CreateMessage(c.msg.Reply, c.codec, building)
+
+	if err != nil {
+		return err
+	}
+
+	return c.conn.PublishMsg(msg)
 }
 
 func (c *RpcContext) Trigger(topic string, event any) error {
